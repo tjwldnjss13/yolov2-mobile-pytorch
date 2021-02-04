@@ -12,6 +12,9 @@ def k_means_cluster_anchor_box(bbox, K):
     # Inputs:
     #    bbox: list [tensor (y1, x1, y2, x2)]
     #    K: int # centroid
+    # Outputs:
+    #    centroids: tensor [K, (y1, x1, y2, x2)]
+    #    clusters: ndarray [# bounding box]
 
     print('Start K-means clustering!')
     centroids = np.array([bbox[0]])
@@ -59,8 +62,10 @@ def k_means_cluster_anchor_box(bbox, K):
                 if len(bboxes_cluster) == 0:
                     continue
                 x1, y1, x2, y2 = np.mean(bboxes_cluster, axis=0)
-                new_cent = np.array([x1, y1, x2, y2])
+                new_cent = np.array(torch.Tensor([y1, x1, y2, x2]))
                 centroids[i] = new_cent
+
+    centroids = torch.as_tensor(centroids)
 
     print('K-means clustering done!')
 
