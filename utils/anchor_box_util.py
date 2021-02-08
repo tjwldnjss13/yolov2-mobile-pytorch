@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 
 from utils.pytorch_util import calculate_iou
 from dataset.voc_dataset import VOCDataset
@@ -79,32 +80,38 @@ def k_means_cluster_anchor_box(bbox, K):
     #    clusters: ndarray, [# bounding box]
 
     print('Start K-means clustering!')
-    centroids = torch.Tensor([[130.2030,  84.8202, 331.2180, 259.0452],
-        [137.4449, 204.0276, 300.2263, 356.9088],
-        [369.0522, 250.4970, 433.3239, 328.3164],
-        [270.1581, 114.8591, 398.2650, 309.8760],
-        [ 50.1476, 135.2850, 139.3589, 302.8188]])
+    # centroids = torch.Tensor([[130.2030,  84.8202, 331.2180, 259.0452],
+    #     [137.4449, 204.0276, 300.2263, 356.9088],
+    #     [369.0522, 250.4970, 433.3239, 328.3164],
+    #     [270.1581, 114.8591, 398.2650, 309.8760],
+    #     [ 50.1476, 135.2850, 139.3589, 302.8188]])
 
-    # centroids = torch.zeros(K, 4)
+    centroids = torch.zeros(1, 4)
     clusters = -1 * torch.ones(bbox.shape[0])
     changed = True
     max_iter = 100
 
-    # print('Selecting initial centroids...')
-    # for i in range(K):
-    #     max_dist = -1
-    #     arg_max_dist = -1
-    #     for b, box in enumerate(bbox):
-    #         if box in centroids:
-    #             continue
-    #         dist = 0
-    #         for cent in centroids:
-    #             dist += distance_metric(box, cent)
-    #         if dist > max_dist:
-    #             max_dist = dist
-    #             arg_max_dist = b
-    #     # centroids = np.concatenate([centroids, [bbox[arg_max_dist]]], axis=0)
-    #     centroids[i] = bbox[arg_max_dist]
+    print('Selecting initial centroids...')
+    idx_init_cent = random.randint(0, bbox.shape[0] - 1)
+    centroids[0] = bbox[idx_init_cent]
+
+    for i in range(1, K):
+        max_dist = -1
+        arg_max_dist = -1
+        for b, box in enumerate(bbox):
+            if box in centroids:
+                continue
+            # Distance metric is IoU, So maximum distance would not exceed 1.
+            nearest_dist = 2
+            for cent in centroids:
+                dist_temp = distance_metric(box, cent)
+                if dist_temp < nearest_dist:
+                    nearest_dist = dist_temp
+            if nearest_dist > max_dist:
+                max_dist = nearest_dist
+                arg_max_dist = b
+        # centroids = np.concatenate([centroids, [bbox[arg_max_dist]]], axis=0)
+        centroids = torch.cat([centroids, bbox[arg_max_dist].unsqueeze(0)], dim=0)
 
     print('[Centroids]')
     print(centroids)
@@ -163,7 +170,7 @@ def get_anchor_boxes_voc(voc_dataset, num_anchor_boxes):
     return anchor_boxes
 
 
-root = 'D://DeepLearningData/VOC2012/'
+root = 'C://DeepLearningData/VOC2012/'
 dset = VOCDataset(root, (1, 1))
 anchor_boxes = get_anchor_boxes_voc(dset, 5)
 print(anchor_boxes)

@@ -9,7 +9,7 @@ class Darknet19DS(nn.Module):
         self.num_classes = num_classes
         self.maxpool = nn.MaxPool2d(2, 2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.models = nn.Sequential(
+        self.models_1 = nn.Sequential(
             nn.Conv2d(3, 32, 3, 1, 1),
             self.maxpool,
             DSConv(32, 64, 3, 1, 1, True),
@@ -27,16 +27,33 @@ class Darknet19DS(nn.Module):
             DSConv(256, 512, 3, 1, 1, True),
             DSConv(512, 256, 1, 1, 0, True),
             DSConv(256, 512, 3, 1, 1, True),
+        )
+        self.models_2 = nn.Sequential(
             self.maxpool,
             DSConv(512, 1024, 3, 1, 1, True),
             DSConv(1024, 512, 1, 1, 0, True),
             DSConv(512, 1024, 3, 1, 1, True),
             DSConv(1024, 512, 1, 1, 0, True),
             DSConv(512, 1024, 3, 1, 1, True),
+            DSConv(1024, 1024, 3, 1, 1, True),
+            DSConv(1024, 1024, 3, 1, 1, True),
+        )
+        self.models_3 = nn.Sequential(
+            DSConv(1024, 1024, 3, 1, 1, True),
+            DSConv(1024, 125, 1, 1, 0, True),
+        )
+        self.passthrough_layer = nn.Sequential(
+
         )
 
     def forward(self, x):
-        x = self.models(x)
+        passthrough = self.models_1(x)
+        x = self.models_2(passthrough)
+        x = self.models_3(x)
 
         return x
 
+
+# from torchsummary import summary
+# model = Darknet19DS(20).cuda()
+# summary(model, (3, 416, 416))

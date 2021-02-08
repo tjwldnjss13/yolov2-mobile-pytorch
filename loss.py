@@ -14,7 +14,7 @@ def yolo_pretrain_custom_loss(predict, target):
 
 
 def yolo_custom_loss(predict, target, n_bbox_predict, lambda_coord=5, lambda_noobj=.5):
-    coord_losses = torch.zeros(7, 7, 2).to(device)
+    coord_losses = torch.zeros(predict.shape[1], predict.shape[2], 2).to(device)
     confidence_losses = torch.zeros(target.shape[1:3]).to(device)
     class_losses = torch.zeros(target.shape[1:3]).to(device)
 

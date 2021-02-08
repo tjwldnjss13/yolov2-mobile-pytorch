@@ -319,19 +319,6 @@ def generate_rpn_targets(predict_bboxes, ground_truth, anchor_boxes, image_size,
 
     return target_deltas, target_prob
 
-# def generate_rpn_mini_batch(anchor_boxes, anchor_box_label, num_positive, num_negative):
-#     # Inputs:
-#     #    anchor_boxes: tensor [# of anchor boxes, (y1, x1, y2, x2)]
-#     #    anchor_box_label: tensor [# of anchor_boxes, integer label(1: positive, 0: negative, -1: no train)]
-#     #    num_positive: int
-#     #    num_negative: int
-#
-#     positive_mask = (anchor_box_label == 1)
-#     negative_mask = (anchor_box_label == 0)
-
-
-
-
 
 
 import torch
