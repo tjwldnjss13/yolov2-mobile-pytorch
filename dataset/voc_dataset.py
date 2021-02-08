@@ -149,7 +149,10 @@ class VOCDataset(data.Dataset):
                 y1 = float(bbox.find('ymin').text)
                 x2 = float(bbox.find('xmax').text)
                 y2 = float(bbox.find('ymax').text)
-                bbox_list.append(torch.Tensor([y1, x1, y2, x2]))
+                bbox_list.append([y1, x1, y2, x2])
+
+        bbox_list = torch.as_tensor(bbox_list)
+        print(bbox_list.shape)
 
         return bbox_list
 
@@ -168,7 +171,3 @@ def custom_collate_fn(batch):
     return [images, anns]
 
 
-root = 'C://DeepLearningData/VOC2012/Train/'
-dset = VOCDataset(root, (416, 416))
-bboxes = dset.get_bounding_box_list()
-print(len(bboxes))

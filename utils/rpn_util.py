@@ -29,7 +29,43 @@ def generate_anchor(feature_size, anchor_stride):
     return anchors
 
 
-def generate_anchor_box(ratios, scales, input_size, anchor_stride):
+def generate_anchor_box(box_samples, input_size, anchor_stride):
+    # Inputs:
+    #    box_samples: tensor, [# box, (y1, x1, y2, x2)]
+    #    input_size: tuple, (height, width)
+    #    anchor_stride: int
+
+    h_in, w_in = input_size
+    h_feat, w_feat = h_in // anchor_stride, w_in // anchor_stride
+    anchors = generate_anchor((h_feat, w_feat), anchor_stride)
+    anchor_boxes = torch.zeros((len(anchors) * len(box_samples)), 4)
+
+    i_anc = 0
+    for anc in anchors:
+        y_anc, x_anc = anc
+        for box in box_samples:
+            h, w = box[2] - box[0], box[3] - box[1]
+            anchor_boxes[i_anc, 0] = y_anc - .5 * h
+            anchor_boxes[i_anc, 1] = x_anc - .5 * w
+            anchor_boxes[i_anc, 2] = y_anc + .5 * h
+            anchor_boxes[i_anc, 3] = x_anc + .5 * w
+
+            i_anc += 1
+
+    valid_mask_1 = (anchor_boxes[:, 0] >= 0)
+    valid_mask_2 = (anchor_boxes[:, 1] >= 0)
+    valid_mask_3 = (anchor_boxes[:, 2] <= input_size[0])
+    valid_mask_4 = (anchor_boxes[:, 3] <= input_size[1])
+
+    valid_mask = valid_mask_1 * valid_mask_2 * valid_mask_3 * valid_mask_4
+    valid_mask = torch.as_tensor(valid_mask)
+
+    print('Anchor boxes generated')
+
+    return anchor_boxes, valid_mask
+
+
+def generate_anchor_box_with_ratio_scale(ratios, scales, input_size, anchor_stride):
     # Inputs:
     #    ratios: list
     #    sclaes: list
