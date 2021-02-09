@@ -4,13 +4,20 @@ from models.dsconv import DSConv
 
 
 class Darknet19DS(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, in_channels, out_channels):
+        """
+        :param num_classes: int
+        :param in_channels: int
+        :param out_channels: int
+        """
         super(Darknet19DS, self).__init__()
         self.num_classes = num_classes
+        self.in_channels = in_channels
+        self.out_channels = out_channels
         self.maxpool = nn.MaxPool2d(2, 2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.models_1 = nn.Sequential(
-            nn.Conv2d(3, 32, 3, 1, 1),
+            nn.Conv2d(self.in_channels, 32, 3, 1, 1),
             self.maxpool,
             DSConv(32, 64, 3, 1, 1, True),
             self.maxpool,
@@ -40,7 +47,7 @@ class Darknet19DS(nn.Module):
         )
         self.models_3 = nn.Sequential(
             DSConv(1024, 1024, 3, 1, 1, True),
-            DSConv(1024, 125, 1, 1, 0, True),
+            DSConv(1024, out_channels, 1, 1, 0, True),
         )
         self.passthrough_layer = nn.Sequential(
 

@@ -16,8 +16,7 @@ class COCODataset(data.Dataset):
         self.is_categorical = is_categorical
         self.transforms = transforms
         self.instance_seg = instance_seg
-        self.num_classes = 91
-
+        self.num_classes = 92  # Background included
 
     def __getitem__(self, index):
         coco = self.coco
@@ -27,6 +26,8 @@ class COCODataset(data.Dataset):
         img_dict = coco.loadImgs(img_id)[0]
         img_fn = img_dict['file_name']
         img = Image.open(os.path.join(self.images_dir, img_fn)).convert('RGB')
+        height = int(img_dict['height'])
+        width = int(img_dict['width'])
 
         num_objs = len(ann)
 
@@ -40,7 +41,7 @@ class COCODataset(data.Dataset):
             y_min = ann[i]['bbox'][1]
             x_max = x_min + ann[i]['bbox'][2]
             y_max = y_min + ann[i]['bbox'][3]
-            boxes.append([x_min, y_min, x_max, y_max])
+            boxes.append([y_min, x_min, y_max, x_max])
             areas.append(ann[i]['area'])
 
             category_id = ann[i]['category_id']
@@ -64,6 +65,8 @@ class COCODataset(data.Dataset):
         iscrowd = torch.zeros((num_objs, ), dtype=torch.int64)
 
         my_annotation = {}
+        my_annotation['height'] = height
+        my_annotation['width'] = width
         my_annotation['mask'] = masks
         my_annotation['bbox'] = boxes
         my_annotation['label'] = labels
@@ -86,6 +89,20 @@ class COCODataset(data.Dataset):
 
     @staticmethod
     def to_categorical(label, num_classes):
+        if isinstance(label, list):
+            label_list = []
+            for l in label:
+                label_base = [0 for _ in range(num_classes)]
+                label_base[l] = 1
+                label_list.append(label_base)
+            return label_list
+        else:
+            label_base = [0 for _ in range(num_classes)]
+            label_base[label] = 1
+            return label_base
+
+    @staticmethod
+    def to_categorical_multi_label(label, num_classes):
         label_result = [0 for _ in range(num_classes)]
         if isinstance(label, list):
             label_result

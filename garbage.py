@@ -4,7 +4,8 @@ import torch.nn as nn
 import cv2 as cv
 import matplotlib.pyplot as plt
 
-
+a = .12315412986124124
+print('{:<22}'.format(a))
 
 # boxes = [[ 49.6859, 139.2234, 135.7689, 300.9905],
 #         [335.6590, 138.2104, 430.3932, 291.0888],
@@ -24,6 +25,7 @@ import matplotlib.pyplot as plt
 #     h, w = y2 - y1, x2 - x1
 #     y1, x1, y2, x2 = cy - int(.5 * h), cx - int(.5 * w), cy + int(.5 * h), cx + int(.5 * w)
 #     cv.rectangle(img, (x1, y1), (x2, y2), (255, 255, 0), thickness=1)
+#     print(h, w)
 #
 # plt.imshow(img)
 # plt.show()

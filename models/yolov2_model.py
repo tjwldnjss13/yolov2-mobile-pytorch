@@ -8,20 +8,20 @@ from utils.rpn_util import generate_anchor_box
 
 class YOLOV2Mobile(nn.Module):
     def __init__(self, in_size, num_classes, anchor_box_samples):
-        # Inputs:
-        #    in_size: tuple or list, (input height, input width)
-        #    num_classes: int
-        #    anchor_box_samples: tensor, [# anchor box, (y1, x1, y2, x2)]
+        """
+        :param in_size: tuple or list, (height of input, width of input)
+        :param num_classes: int
+        :param anchor_box_samples: tensor, [num anchor boxes, (height of anchor box, width of anchor box)]
+        """
 
         super(YOLOV2Mobile, self).__init__()
         self.in_size = in_size
         self.num_classes = num_classes
         self.anchor_box_samples = anchor_box_samples
 
-        self.feature_model = Darknet19DS(self.num_classes)
-        self.reg_layer = DSConv(1024, len(anchor_box_samples) * (self.num_classes + 5), 1, 1, 0, True)
+        self.feature_model = Darknet19DS(self.num_classes, in_channels=3, out_channels=(5 + self.num_classes) * len(self.anchor_box_samples))
 
-        self.anchor_boxes = self._get_valid_anchor_boxes()
+        # self.anchor_boxes = self._get_valid_anchor_boxes()
 
     def _get_valid_anchor_boxes(self):
         dummy = torch.zeros(1, 3, 416, 416)
@@ -34,7 +34,11 @@ class YOLOV2Mobile(nn.Module):
 
     def forward(self, x):
         x = self.feature_model(x)
-        x = self.reg_layer(x)
+        x = x.permute(0, 2, 3, 1)
 
         return x
 
+# model = YOLOV2Mobile((416, 416), 91, torch.Tensor([[20, 30], [10, 40]])).cuda()
+# dummy = torch.Tensor(1, 3, 416, 416).cuda()
+# pred = model(dummy)
+# print(pred.shape)
