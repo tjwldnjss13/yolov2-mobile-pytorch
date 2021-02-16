@@ -4,6 +4,7 @@ import random
 import numpy as np
 import torch
 import torch.utils.data as data
+import torchvision.transforms as transforms
 import xml.etree.ElementTree as Et
 
 from PIL import Image
@@ -61,14 +62,15 @@ class VOCDataset(data.Dataset):
             if self.transforms is not None:
                 img = self.transforms(img)
             else:
-                img = torch.as_tensor(img, dtype=torch.float64)
+                transform = transforms.Compose([transforms.ToTensor()])
+                img = transform(img)
 
-            h_img, w_img = img_np.shape[0], img_np.shape[1]
-            h_in, w_in = self.img_size[0], self.img_size[1]
+            h_img, w_img = img_np.shape[:2]
+            h_in, w_in = self.img_size
             ratio_h, ratio_w = h_in / h_img, w_in / w_img
 
             objs = ann.findall('object')
-            classes = []
+            labels = []
             bboxes = []
             for obj in objs:
                 name = obj.find('name').text
@@ -78,19 +80,23 @@ class VOCDataset(data.Dataset):
                 xmax = float(bbox.find('xmax').text) * ratio_w
                 ymax = float(bbox.find('ymax').text) * ratio_h
 
-                class_ = self.class_dict[name]
-                if self.is_categorical:
-                    class_ = self.to_categorical(class_, self.num_classes)
-                    class_ = torch.as_tensor(class_)
-                bbox = [ymin, xmin, ymax, xmax]
+                label = self.class_dict[name]
+                # if self.is_categorical:
+                #     class_ = self.to_categorical(class_, self.num_classes)
+                #     class_ = torch.as_tensor(class_)
 
-                classes.append(class_)
+                bbox = torch.as_tensor([ymin, xmin, ymax, xmax])
+
+                labels.append(label)
                 bboxes.append(bbox)
 
-            # label = torch.as_tensor(label, dtype=torch.int64)
-            # bbox = torch.as_tensor(bbox, dtype=torch.float32)
+            if self.is_categorical:
+                labels = self.to_categorical(labels, self.num_classes)
 
-            ann = {'class': classes, 'bbox': bboxes, 'filename': img_fn}
+            labels = torch.as_tensor(labels, dtype=torch.int64)
+            bboxes = torch.as_tensor(bbox, dtype=torch.float32)
+
+            ann = {'label': labels, 'bbox': bboxes, 'filename': img_fn}
 
             return img, ann
 
@@ -113,8 +119,8 @@ class VOCDataset(data.Dataset):
             ann_path = os.path.join(ann_dir, ann_fn)
             ann = open(ann_path, 'r')
             tree = Et.parse(ann)
-            _root = tree.getroot()
-            anns.append(_root)
+            root_ = tree.getroot()
+            anns.append(root_)
             ann.close()
 
         print('Annotations loaded!')
@@ -137,31 +143,19 @@ class VOCDataset(data.Dataset):
 
         return fns
 
-    def get_bounding_box_list(self):
-        bbox_list = []
-        anns = self.annotation
-
-        for i in range(len(anns)):
-            objs = anns[i].findall('object')
-            for obj in objs:
-                bbox = obj.find('bndbox')
-                x1 = float(bbox.find('xmin').text)
-                y1 = float(bbox.find('ymin').text)
-                x2 = float(bbox.find('xmax').text)
-                y2 = float(bbox.find('ymax').text)
-                bbox_list.append([y1, x1, y2, x2])
-
-        bbox_list = torch.as_tensor(bbox_list)
-        print(bbox_list.shape)
-
-        return bbox_list
-
     @staticmethod
-    def to_categorical(label, n_class):
-        label_ = [0 for _ in range(n_class)]
-        label_[label] = 1
+    def to_categorical(label, num_classes):
+        label_result = [0 for _ in range(num_classes)]
+        if isinstance(label, list):
+            for l in label:
+                label_result[l] = 1
+        else:
+            label_result[label] = 1
 
-        return label_
+        # label_ = [0 for _ in range(n_class)]
+        # label_[label] = 1
+
+        return label_result
 
 
 def custom_collate_fn(batch):
@@ -169,5 +163,4 @@ def custom_collate_fn(batch):
     anns = [item[1] for item in batch]
 
     return [images, anns]
-
 

@@ -4,8 +4,8 @@ import torch.nn as nn
 import cv2 as cv
 import matplotlib.pyplot as plt
 
-a = .12315412986124124
-print('{:<22}'.format(a))
+a = torch.Tensor([1.2])
+print(int(a))
 
 # boxes = [[ 49.6859, 139.2234, 135.7689, 300.9905],
 #         [335.6590, 138.2104, 430.3932, 291.0888],

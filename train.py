@@ -6,12 +6,13 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset, random_split
 
 from utils.util import time_calculator
 from utils.pytorch_util import make_batch
 from utils.yolov2_tensor_generator import get_output_anchor_box_tensor, get_yolo_v2_output_tensor, get_yolo_v2_target_tensor
-from dataset.coco_dataset import COCODataset, custom_collate_fn
+# from dataset.coco_dataset import COCODataset, custom_collate_fn
+from dataset.voc_dataset import VOCDataset, custom_collate_fn
 from models.yolov2_model import YOLOV2Mobile
 from loss import yolo_custom_loss
 
@@ -23,9 +24,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.005)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.005)
-    parser.add_argument('--num_epochs', type=int, required=False, default=20)
+    parser.add_argument('--lr', type=float, required=False, default=.00001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.001)
+    parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
 
@@ -34,26 +35,60 @@ if __name__ == '__main__':
     weight_decay = args.weight_decay
     num_epochs = args.num_epochs
 
+    model_save_term = 2
+
     # Generate COCO dataset
-    dset_name = 'coco2017'
-    root = 'C://DeepLearningData/COCOdataset2017/'
-    train_img_dir = os.path.join(root, 'images', 'train')
-    val_img_dir = os.path.join(root, 'images', 'val')
-    train_ann_pth = os.path.join(root, 'annotations', 'instances_train2017.json')
-    val_ann_pth = os.path.join(root, 'annotations', 'instances_val2017.json')
-    transform = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])
+    # dset_name = 'coco2017'
+    # root = 'C://DeepLearningData/COCOdataset2017/'
+    # train_img_dir = os.path.join(root, 'images', 'train')
+    # val_img_dir = os.path.join(root, 'images', 'val')
+    # train_ann_pth = os.path.join(root, 'annotations', 'instances_train2017.json')
+    # val_ann_pth = os.path.join(root, 'annotations', 'instances_val2017.json')
+    # transform = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])
+    #
+    # train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, is_categorical=True, transforms=transform)
+    # val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, is_categorical=True, transforms=transform)
 
-    train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, is_categorical=True, transforms=transform)
-    val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, is_categorical=True, transforms=transform)
+    # Generate VOC dataset
+    dset_name = 'voc2012'
+    root = 'C://DeepLearningData/VOC2012'
 
+    original_transforms = transforms.Compose([transforms.Resize((416, 416)),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    rotate_transforms = transforms.Compose([transforms.Resize((416, 416)),
+                                            transforms.RandomRotation((-30, 30)),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    vertical_flip_transforms = transforms.Compose([transforms.Resize((416, 416)),
+                                                   transforms.RandomVerticalFlip(1),
+                                                   transforms.ToTensor(),
+                                                   transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+
+    original_dset = VOCDataset(root, img_size=(416, 416), transforms=original_transforms, is_categorical=True)
+    rotate_dset = VOCDataset(root, img_size=(416, 416), transforms=rotate_transforms, is_categorical=True)
+    vertical_flip_dset = VOCDataset(root, img_size=(416, 416), transforms=vertical_flip_transforms, is_categorical=True)
+
+    num_classes = original_dset.num_classes
+
+    n_data = len(original_dset)
+    n_train_data = int(n_data * .7)
+    n_val_data = n_data - n_train_data
+    tarin_val_ratio = [n_train_data, n_val_data]
+
+    original_dset, val_dset = random_split(original_dset, tarin_val_ratio)
+    rotate_dset, _ = random_split(rotate_dset, tarin_val_ratio)
+    vertical_flip_dset, _ = random_split(vertical_flip_dset, tarin_val_ratio)
+
+    train_dset = ConcatDataset([original_dset, rotate_dset, vertical_flip_dset])
+
+    # Generate data loaders
     train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
     val_loader = DataLoader(val_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
 
-    num_classes = train_dset.num_classes
-
     # Load model
     model_name = 'yolov2mobile'
-    anchor_box_samples = torch.Tensor([[86, 161], [95, 153], [169, 183], [203, 180], [45, 48]])
+    anchor_box_samples = torch.Tensor([[1.19, 1.08], [4.41, 3.42], [11.38, 6.63], [5.11, 9.42], [10.52, 16.62]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
     if state_dict_pth is not None:
@@ -67,7 +102,6 @@ if __name__ == '__main__':
     dummy = torch.zeros(1, 3, 416, 416).to(device)
     pred_dummy = model(dummy)
 
-    anchor_box_sizes = torch.Tensor([[86, 161], [95, 153], [169, 183], [203, 180], [45, 48]])
     anchor_box_base = get_output_anchor_box_tensor(anchor_box_sizes=anchor_box_samples, out_size=pred_dummy.shape[1:3]).to(device)
 
     train_loss_list = []
@@ -95,26 +129,28 @@ if __name__ == '__main__':
             y_list = []
 
             for b in range(len(anns)):
-                h_img, w_img = anns[b]['height'], anns[b]['width']
                 ground_truth_box = anns[b]['bbox']
                 label = anns[b]['label']
 
-                ratio_h, ratio_w = 416 / h_img, 416 / w_img
+                h_img, w_img = 416, 416
+                ratio_y, ratio_x = 1 / 32, 1 / 32
                 ground_truth_box = torch.as_tensor(ground_truth_box)
                 if len(ground_truth_box.shape) < 2:
-                    ground_truth_box.unsqueeze(0)
-                if len(ground_truth_box) > 0:
-                    ground_truth_box[:, 0] *= ratio_h
-                    ground_truth_box[:, 1] *= ratio_w
-                    ground_truth_box[:, 2] *= ratio_h
-                    ground_truth_box[:, 3] *= ratio_w
+                    ground_truth_box = ground_truth_box.unsqueeze(0)
+                # if len(ground_truth_box) > 0:
+                #     ground_truth_box[:, 0] *= ratio_h
+                #     ground_truth_box[:, 0] -= ground_truth_box[:, 0].int()
+                #     ground_truth_box[:, 1] *= ratio_w
+                #     ground_truth_box[:, 1] -= ground_truth_box[:, 1].int()
+                #     ground_truth_box[:, 2] *= ratio_h
+                #     ground_truth_box[:, 3] *= ratio_w
 
                 predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
                 y_list.append(get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
                                                         labels=label,
                                                         n_bbox_predict=5,
                                                         n_class=num_classes,
-                                                        in_size=(416, 416),
+                                                        in_size=(h_img, w_img),
                                                         out_size=(13, 13)))
 
             y = make_batch(y_list).to(device)
@@ -160,26 +196,26 @@ if __name__ == '__main__':
                 y_list = []
 
                 for b in range(len(anns)):
-                    h_img, w_img = anns[b]['height'], anns[b]['width']
+                    h_img, w_img = 416, 416
                     ground_truth_box = anns[b]['bbox']
                     label = anns[b]['label']
 
-                    ratio_h, ratio_w = 416 / h_img, 416 / w_img
+                    ratio_h, ratio_w = 1 / 32, 1 / 32
                     ground_truth_box = torch.as_tensor(ground_truth_box)
                     if len(ground_truth_box.shape) < 2:
-                        ground_truth_box.unsqueeze(0)
-                    if len(ground_truth_box) > 0:
-                        ground_truth_box[:, 0] *= ratio_h
-                        ground_truth_box[:, 1] *= ratio_w
-                        ground_truth_box[:, 2] *= ratio_h
-                        ground_truth_box[:, 3] *= ratio_w
+                        ground_truth_box = ground_truth_box.unsqueeze(0)
+                    # if len(ground_truth_box) > 0:
+                    #     ground_truth_box[:, 0] *= ratio_h
+                    #     ground_truth_box[:, 1] *= ratio_w
+                    #     ground_truth_box[:, 2] *= ratio_h
+                    #     ground_truth_box[:, 3] *= ratio_w
 
-                    predict_list.append(get_yolo_v2_output_tensor(predict_temp, anchor_box_base))
+                    predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
                     y_list.append(get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
                                                             labels=label,
                                                             n_bbox_predict=5,
                                                             n_class=num_classes,
-                                                            in_size=(416, 416),
+                                                            in_size=(h_img, w_img),
                                                             out_size=(13, 13)))
 
                 y = make_batch(y_list).to(device)
@@ -198,7 +234,7 @@ if __name__ == '__main__':
 
             print('<val_loss> {:<21}'.format(val_loss_list[-1]))
 
-            if (e + 1) % 2 == 0:
+            if (e + 1) % model_save_term == 0:
                 save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss.pth'.format(model_name, dset_name, e + 1, learning_rate, val_loss_list[-1])
                 torch.save(model.state_dict(), save_pth)
 

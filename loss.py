@@ -127,6 +127,3 @@ def yolo_custom_loss(predict, target, n_bbox_predict, n_class, lambda_coord=5, l
 
     return loss
 
-
-if __name__ == '__main__':
-    a = torch.Tensor((2, 20))

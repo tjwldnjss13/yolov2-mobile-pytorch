@@ -89,17 +89,18 @@ class COCODataset(data.Dataset):
 
     @staticmethod
     def to_categorical(label, num_classes):
+        label_list = []
         if isinstance(label, list):
-            label_list = []
             for l in label:
                 label_base = [0 for _ in range(num_classes)]
                 label_base[l] = 1
                 label_list.append(label_base)
-            return label_list
         else:
             label_base = [0 for _ in range(num_classes)]
             label_base[label] = 1
-            return label_base
+            label_list.append(label_base)
+
+        return label_list
 
     @staticmethod
     def to_categorical_multi_label(label, num_classes):

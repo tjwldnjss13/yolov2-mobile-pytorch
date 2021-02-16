@@ -82,14 +82,17 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_clas
     in_h, in_w = in_size
     out_h, out_w = out_size
 
-    ratio = out_h / in_h
+    ratio_y = out_h / in_h
+    ratio_x = out_w / in_w
 
     target = torch.zeros((out_h, out_w, (5 + n_class) * n_bbox_predict))
 
     for i in range(n_gt):
         bbox = bboxes[i]
-        h, w = (bbox[2] - bbox[0]) / in_h, (bbox[3] - bbox[1]) / in_w  # Height, width is relative to original image
-        y, x = (bbox[0] + .5 * h) * ratio, (bbox[1] + .5 * w) * ratio
+        h, w = (bbox[2] - bbox[0]), (bbox[3] - bbox[1])  # Height, width is relative to original image
+        y, x = (bbox[0] + .5 * h) * ratio_y, (bbox[1] + .5 * w) * ratio_x
+
+        h, w = h * ratio_y, w * ratio_x
 
         y_cell_idx, x_cell_idx = int(y), int(x)
         y_cell, x_cell = y - int(y), x - int(x)
