@@ -19,7 +19,8 @@ class YOLOV2Mobile(nn.Module):
         self.num_classes = num_classes
         self.anchor_box_samples = anchor_box_samples
 
-        self.feature_model = Darknet19DS(self.num_classes, in_channels=3, out_channels=(5 + self.num_classes) * len(self.anchor_box_samples))
+        self.feature_model = Darknet19DS()
+        self.reg_layer = DSConv(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0)
 
         # self.anchor_boxes = self._get_valid_anchor_boxes()
 
@@ -34,6 +35,7 @@ class YOLOV2Mobile(nn.Module):
 
     def forward(self, x):
         x = self.feature_model(x)
+        x = self.reg_layer(x)
         x = x.permute(0, 2, 3, 1)
 
         return x

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import time
 import argparse
 import torch
@@ -6,7 +7,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-from torch.utils.data import DataLoader, ConcatDataset, random_split
+from torch.utils.data import DataLoader, ConcatDataset, Subset
 
 from utils.util import time_calculator
 from utils.pytorch_util import make_batch
@@ -24,8 +25,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.00001)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.001)
+    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.1)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -51,36 +52,44 @@ if __name__ == '__main__':
 
     # Generate VOC dataset
     dset_name = 'voc2012'
-    root = 'C://DeepLearningData/VOC2012'
+    root = 'D://DeepLearningData/VOC2012'
 
-    original_transforms = transforms.Compose([transforms.Resize((416, 416)),
+    transform_og = transforms.Compose([transforms.Resize((416, 416)),
                                               transforms.ToTensor(),
                                               transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    rotate_transforms = transforms.Compose([transforms.Resize((416, 416)),
-                                            transforms.RandomRotation((-30, 30)),
+    transform_rotate = transforms.Compose([transforms.Resize((416, 416)),
+                                            transforms.RandomRotation((-60, 60)),
                                             transforms.ToTensor(),
                                             transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    vertical_flip_transforms = transforms.Compose([transforms.Resize((416, 416)),
+    transform_vflip = transforms.Compose([transforms.Resize((416, 416)),
                                                    transforms.RandomVerticalFlip(1),
                                                    transforms.ToTensor(),
                                                    transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_hflip = transforms.Compose([transforms.Resize((416, 416)),
+                                                     transforms.RandomHorizontalFlip(1),
+                                                     transforms.ToTensor(),
+                                                     transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
 
-    original_dset = VOCDataset(root, img_size=(416, 416), transforms=original_transforms, is_categorical=True)
-    rotate_dset = VOCDataset(root, img_size=(416, 416), transforms=rotate_transforms, is_categorical=True)
-    vertical_flip_dset = VOCDataset(root, img_size=(416, 416), transforms=vertical_flip_transforms, is_categorical=True)
+    dset_og = VOCDataset(root, img_size=(416, 416), transforms=transform_og, is_categorical=True)
+    dset_rotate = VOCDataset(root, img_size=(416, 416), transforms=transform_rotate, is_categorical=True)
+    dset_vflip = VOCDataset(root, img_size=(416, 416), transforms=transform_vflip, is_categorical=True)
+    dset_hflip = VOCDataset(root, img_size=(416, 416), transforms=transform_hflip, is_categorical=True)
 
-    num_classes = original_dset.num_classes
+    num_classes = dset_og.num_classes
 
-    n_data = len(original_dset)
+    n_data = len(dset_og)
     n_train_data = int(n_data * .7)
-    n_val_data = n_data - n_train_data
-    tarin_val_ratio = [n_train_data, n_val_data]
+    indices = list(range(n_data))
 
-    original_dset, val_dset = random_split(original_dset, tarin_val_ratio)
-    rotate_dset, _ = random_split(rotate_dset, tarin_val_ratio)
-    vertical_flip_dset, _ = random_split(vertical_flip_dset, tarin_val_ratio)
+    indicies = np.random.shuffle(indices)
+    train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
+    train_dset_og = Subset(dset_og, indices=train_idx)
+    train_dset_rotate = Subset(dset_rotate, indices=train_idx)
+    train_dset_vflip = Subset(dset_vflip, indices=train_idx)
+    train_dset_hflip = Subset(dset_hflip, indices=train_idx)
 
-    train_dset = ConcatDataset([original_dset, rotate_dset, vertical_flip_dset])
+    train_dset = ConcatDataset([dset_og, dset_rotate, dset_vflip, dset_hflip])
+    val_dset = Subset(dset_og, indices=val_idx)
 
     # Generate data loaders
     train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
