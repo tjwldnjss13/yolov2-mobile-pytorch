@@ -152,22 +152,56 @@ def pad_2dim(x, ref_size):
     return x
 
 
-def calculate_iou(box1, box2):
-    # Inputs:
-    #    box1, box2: tensor [y1, x1, y2, x2]
+def calculate_iou(box1, box2, dim=0):
+    """ Ablelable until 3-dim
+    :param box1: tensor, [(y1, x1, y2, x2)]
+    :param box2: tensor, [(y1, x1, y2, x2)]
+    :param dim: int
 
-    y1_inter = torch.max(box1[0], box2[0])
-    x1_inter = torch.max(box1[1], box2[1])
-    y2_inter = torch.min(box1[2], box2[2])
-    x2_inter = torch.min(box1[3], box2[3])
+    :return:
+    """
 
-    area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
+    if dim == 0:
+        y1_inter = torch.max(box1[0], box2[0])
+        x1_inter = torch.max(box1[1], box2[1])
+        y2_inter = torch.min(box1[2], box2[2])
+        x2_inter = torch.min(box1[3], box2[3])
 
-    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-    area_union = area_box1 + area_box2 - area_inter
+        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
 
-    iou = area_inter / area_union
+        area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        area_union = area_box1 + area_box2 - area_inter
+
+        iou = area_inter / area_union
+
+    elif dim == 1:
+        y1_inter = torch.max(box1[:, 0], box2[:, 0])
+        x1_inter = torch.max(box1[:, 1], box2[:, 1])
+        y2_inter = torch.min(box1[:, 2], box2[:, 2])
+        x2_inter = torch.min(box1[:, 3], box2[:, 3])
+
+        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
+
+        area_box1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])
+        area_box2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
+        area_union = area_box1 + area_box2 - area_inter
+
+        iou = area_inter / area_union
+
+    elif dim == 2:
+        y1_inter = torch.max(box1[:, :, 0], box2[:, :, 0])
+        x1_inter = torch.max(box1[:, :, 1], box2[:, :, 1])
+        y2_inter = torch.min(box1[:, :, 2], box2[:, :, 2])
+        x2_inter = torch.min(box1[:, :, 3], box2[:, :, 3])
+
+        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
+
+        area_box1 = (box1[:, :, 2] - box1[:, :, 0]) * (box1[:, :, 3] - box1[:, :, 1])
+        area_box2 = (box2[:, :, 2] - box2[:, :, 0]) * (box2[:, :, 3] - box2[:, :, 1])
+        area_union = area_box1 + area_box2 - area_inter
+
+        iou = area_inter / area_union
 
     return iou
 

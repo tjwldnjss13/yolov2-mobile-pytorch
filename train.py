@@ -25,8 +25,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--lr', type=float, required=False, default=.0001)
     parser.add_argument('--weight_decay', type=float, required=False, default=.1)
+    parser.add_argument('--momentum', type=float, required=False, default=.9)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -34,6 +35,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     learning_rate = args.lr
     weight_decay = args.weight_decay
+    momentum = args.momentum
     num_epochs = args.num_epochs
 
     model_save_term = 2
@@ -52,7 +54,7 @@ if __name__ == '__main__':
 
     # Generate VOC dataset
     dset_name = 'voc2012'
-    root = 'D://DeepLearningData/VOC2012'
+    root = 'C://DeepLearningData/VOC2012'
 
     transform_og = transforms.Compose([transforms.Resize((416, 416)),
                                               transforms.ToTensor(),
@@ -81,7 +83,7 @@ if __name__ == '__main__':
     n_train_data = int(n_data * .7)
     indices = list(range(n_data))
 
-    indicies = np.random.shuffle(indices)
+    np.random.shuffle(indices)
     train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
     train_dset_og = Subset(dset_og, indices=train_idx)
     train_dset_rotate = Subset(dset_rotate, indices=train_idx)
@@ -105,6 +107,7 @@ if __name__ == '__main__':
 
     # Define optimizer, loss function
     optimizer = optim.Adam(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum, nesterov=True)
     loss_func = yolo_custom_loss
 
     # Define anchor box configuration
@@ -168,7 +171,7 @@ if __name__ == '__main__':
             del predict_temp, predict_list, y_list
 
             optimizer.zero_grad()
-            loss = loss_func(predict=predict, target=y, n_bbox_predict=5, n_class=num_classes)
+            loss = loss_func(predict=predict, target=y, num_bbox_predict=5, num_classes=num_classes)
             loss.backward()
             optimizer.step()
 

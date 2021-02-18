@@ -26,4 +26,17 @@ import matplotlib.pyplot as plt
 # plt.imshow(img)
 # plt.show()
 
-a = nn.Conv2d(3, 4.0, 3, 1, 1)
+a = torch.Tensor([[[1, 2, 3],
+                   [4, 5, 6],
+                   [7, 8, 9]],
+                  [[11, 22, 33],
+                   [44, 55, 66],
+                   [77, 88, 99]]])
+print(a.shape)
+b = torch.zeros(2, 3)
+
+for i in range(a.shape[0]):
+    a[i] *= b[i]
+print(a)
+
+

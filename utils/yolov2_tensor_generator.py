@@ -64,6 +64,51 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     return out
 
 
+# def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_class, in_size, out_size):
+#     """
+#     :param ground_truth_boxes: tensor, [num ground truth, (y1, x1, y2, x2)]
+#     :param labels: tensor, [num bounding boxes, (p0, p1, ..., pn)]
+#     :param n_bbox_predict: int
+#     :param n_class: int
+#     :param in_size: tuple or list, (height, width)
+#     :param out_size: tuple or list, (height, width)
+#
+#     :return: tensor, [height of output, width of output, (cy, cx, h, w, p) * num bounding boxes]
+#     """
+#
+#     bboxes = ground_truth_boxes
+#
+#     n_gt = len(bboxes)
+#     in_h, in_w = in_size
+#     out_h, out_w = out_size
+#
+#     ratio_y = out_h / in_h
+#     ratio_x = out_w / in_w
+#
+#     target = torch.zeros((out_h, out_w, 5 + n_class))
+#
+#     for i in range(n_gt):
+#         bbox = bboxes[i]
+#         h, w = (bbox[2] - bbox[0]), (bbox[3] - bbox[1])  # Height, width is relative to original image
+#         y, x = (bbox[0] + .5 * h) * ratio_y, (bbox[1] + .5 * w) * ratio_x
+#
+#         h, w = h * ratio_y, w * ratio_x
+#
+#         y_cell_idx, x_cell_idx = int(y), int(x)
+#         y_cell, x_cell = y - int(y), x - int(x)
+#         label = labels[i]
+#
+#         target[y_cell_idx, x_cell_idx, 0] = x_cell
+#         target[y_cell_idx, x_cell_idx, 1] = y_cell
+#         target[y_cell_idx, x_cell_idx, 2] = w
+#         target[y_cell_idx, x_cell_idx, 3] = h
+#         target[y_cell_idx, x_cell_idx, 4] = 1
+#
+#         target[y_cell_idx, x_cell_idx, 5:] = label
+#
+#     return target
+
+
 def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_class, in_size, out_size):
     """
     :param ground_truth_boxes: tensor, [num ground truth, (y1, x1, y2, x2)]
