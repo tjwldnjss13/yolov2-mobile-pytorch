@@ -29,14 +29,19 @@ import matplotlib.pyplot as plt
 a = torch.Tensor([[[1, 2, 3],
                    [4, 5, 6],
                    [7, 8, 9]],
-                  [[11, 22, 33],
-                   [44, 55, 66],
+                  [[33, 22, 11],
+                   [44, 66, 55],
                    [77, 88, 99]]])
-print(a.shape)
-b = torch.zeros(2, 3)
 
-for i in range(a.shape[0]):
-    a[i] *= b[i]
+idx1, idx2 = torch.max(a, dim=2).indices
+# [0, 0, 0, 1, 1, 1] [0, 1, 2, 0, 1, 2] [2, 2, 2, 0, 1, 2]
+idx1 = torch.Tensor([0, 0, 0, 1, 1, 1]).long()
+idx2 = torch.Tensor([0, 1, 2, 0, 1, 2]).long()
+idx3 = torch.Tensor([2, 2, 2, 0, 1, 2]).long()
+print(a[idx1, idx2, idx3])
+temp = torch.zeros(6)
+a[idx1, idx2, idx3] = temp
 print(a)
+
 
 

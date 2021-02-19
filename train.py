@@ -26,8 +26,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--lr', type=float, required=False, default=.0001)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.1)
-    parser.add_argument('--momentum', type=float, required=False, default=.9)
+    parser.add_argument('--weight_decay', type=float, required=False, default=0)
+    parser.add_argument('--momentum', type=float, required=False, default=0)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     # Define optimizer, loss function
     optimizer = optim.Adam(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum, nesterov=True)
+    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     loss_func = yolo_custom_loss
 
     # Define anchor box configuration

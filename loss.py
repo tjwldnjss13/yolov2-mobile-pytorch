@@ -40,7 +40,7 @@ def yolo_custom_loss(predict, target, num_bbox_predict, num_classes, lambda_coor
     pred_probs = pred[:, :, 4]
 
     tar_bboxes = tar[:, :, :4]
-    tar_probs = tar[:, :, 4]
+    tar_probs = tar[:, :, 4]  # [num batch, h * w * 5(num predict bbox)]
 
     pred_y1 = pred_bboxes[:, :, 0] - .5 * pred_bboxes[:, :, 2]
     pred_x1 = pred_bboxes[:, :, 1] - .5 * pred_bboxes[:, :, 3]
@@ -62,13 +62,13 @@ def yolo_custom_loss(predict, target, num_bbox_predict, num_classes, lambda_coor
 
     ious_valid = calculate_iou(pred_bboxes_valid, tar_bboxes_valid, dim=2)
 
-    ious = torch.zeros(NUM_BATCH, H * W * 5).to(device)
+    ious = torch.zeros(NUM_BATCH, H * W * 5).to(device)  # [num batch, h * w * 5(num predict bbox)]
     ious[indices_valid] = ious_valid
     ious = ious.reshape(NUM_BATCH, H * W, 5)
 
     indices_argmax_ious = torch.argmax(ious, dim=2)
 
-    obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
+    obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)  # [num batch, h * w, 5(num predict bbox)]
     obj_responsible_mask[indices_argmax_ious] = 1
 
     no_obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
@@ -90,10 +90,16 @@ def yolo_custom_loss(predict, target, num_bbox_predict, num_classes, lambda_coor
     loss_confidence = torch.square(pred[:, :, 4] - tar[:, :, 4]) + \
                       lambda_noobj * no_obj_responsible_mask * torch.square(pred[:, :, 4] - tar[:, :, 4])
 
+    # Get class loss(3)
     loss_class = torch.square(pred[:, :, 5:] - tar[:, :, 5:])
+    loss_class = loss_class.reshape(NUM_BATCH, H * W, -1)
+    loss_class = torch.sum(loss_class, dim=2)
+    loss_class *= responsible_mask
 
+    # Sum up all the losses
+    loss = loss_coord + loss_confidence + loss_class
 
-
+    return loss / NUM_BATCH
 
 
 def yolo_custom_loss(predict, target, n_bbox_predict, n_class, lambda_coord=5, lambda_noobj=.5):
