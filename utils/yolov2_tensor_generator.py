@@ -48,14 +48,14 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     sigmoid = torch.nn.Sigmoid()
     softmax = torch.nn.Softmax(dim=2)
 
-    num_anchor_boxes = int(anchor_boxes.shape[2] / 4)
+    num_anchor_boxes = int(anchor_boxes.shape[2] / 5)
     num_data_per_box = int(deltas.shape[2] / num_anchor_boxes)
 
     for i in range(num_anchor_boxes):
         out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
             sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2]) + \
             anchor_boxes[:, :, 4 * i:4 * i + 2]
-        out[:, :, 4 * i:4 * i + 2] = torch.exp(deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]) * \
+        out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]) * \
                                      anchor_boxes[:, :, 4 * i + 2:4 * (i + 1)]
         out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \

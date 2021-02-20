@@ -15,7 +15,7 @@ from utils.yolov2_tensor_generator import get_output_anchor_box_tensor, get_yolo
 # from dataset.coco_dataset import COCODataset, custom_collate_fn
 from dataset.voc_dataset import VOCDataset, custom_collate_fn
 from models.yolov2_model import YOLOV2Mobile
-from loss import yolo_custom_loss
+from loss import yolov2_custom_loss_1 as yolo_custom_loss
 
 
 if __name__ == '__main__':
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.0001)
+    parser.add_argument('--lr', type=float, required=False, default=.001)
     parser.add_argument('--weight_decay', type=float, required=False, default=0)
     parser.add_argument('--momentum', type=float, required=False, default=0)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     # Generate VOC dataset
     dset_name = 'voc2012'
-    root = 'C://DeepLearningData/VOC2012'
+    root = 'D://DeepLearningData/VOC2012'
 
     transform_og = transforms.Compose([transforms.Resize((416, 416)),
                                               transforms.ToTensor(),
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         H, M, S = time_calculator(t_train_end - t_train_start)
 
         print('        <train_loss> {:<21} '.format(train_loss_list[-1]), end='')
-        print('<time> {:02d}:{:02d}:{:02d} '.format(int(H), int(M), int(S)), end='')
+        print('<time> {:02d}:{:02d}:{:02d} '.format(int(H), int(M), int(S)))
 
         with torch.no_grad():
             model.eval()
@@ -235,7 +235,7 @@ if __name__ == '__main__':
 
                 del predict_temp, predict_list, y_list
 
-                loss = loss_func(predict=predict, target=y, n_bbox_predict=5, n_class=num_classes)
+                loss = loss_func(predict=predict, target=y, num_bbox_predict=5, num_classes=num_classes)
 
                 val_loss += loss.detach().cpu().item()
 
@@ -244,7 +244,7 @@ if __name__ == '__main__':
             val_loss /= num_batches
             val_loss_list.append(val_loss)
 
-            print('<val_loss> {:<21}'.format(val_loss_list[-1]))
+            print('        <val_loss> {:<21}'.format(val_loss_list[-1]))
 
             if (e + 1) % model_save_term == 0:
                 save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss.pth'.format(model_name, dset_name, e + 1, learning_rate, val_loss_list[-1])

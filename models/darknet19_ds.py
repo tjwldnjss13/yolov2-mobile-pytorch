@@ -41,6 +41,7 @@ class Darknet19DS(nn.Module):
         )
         self.layer_3 = DSConv(3072, 1024, 1, 1, 0, use_activation=True)
         self.passthrough_layer = DSConv(512, 512, 3, 1, 1)
+        self.relu6 = nn.ReLU6(True)
 
     def forward(self, x):
         _pass = x = self.layer_1(x)
@@ -55,6 +56,7 @@ class Darknet19DS(nn.Module):
                            _pass[:, :, h_cut:, w_cut:]], dim=1)
 
         x = torch.cat([x, _pass], dim=1)
+        x = self.relu6(x)
 
         x = self.layer_3(x)
 

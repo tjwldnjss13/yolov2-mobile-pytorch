@@ -33,11 +33,19 @@ a = torch.Tensor([[[1, 2, 3],
                    [44, 66, 55],
                    [77, 88, 99]]])
 
-idx1, idx2 = torch.max(a, dim=2).indices
+idx = torch.max(a, dim=2).indices
 # [0, 0, 0, 1, 1, 1] [0, 1, 2, 0, 1, 2] [2, 2, 2, 0, 1, 2]
-idx1 = torch.Tensor([0, 0, 0, 1, 1, 1]).long()
-idx2 = torch.Tensor([0, 1, 2, 0, 1, 2]).long()
-idx3 = torch.Tensor([2, 2, 2, 0, 1, 2]).long()
+
+idx1 = []
+for i in range(idx.shape[0]):
+    idx1 += [i for _ in range(idx.shape[1])]
+
+idx2 = []
+for i in range(idx.shape[0]):
+    idx2 += [j for j in range(idx.shape[1])]
+
+idx3 = idx.reshape(-1).squeeze()
+
 print(a[idx1, idx2, idx3])
 temp = torch.zeros(6)
 a[idx1, idx2, idx3] = temp

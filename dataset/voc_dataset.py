@@ -145,15 +145,18 @@ class VOCDataset(data.Dataset):
 
     @staticmethod
     def to_categorical(label, num_classes):
-        label_result = [0 for _ in range(num_classes)]
-        if isinstance(label, list):
-            for l in label:
-                label_result[l] = 1
-        else:
-            label_result[label] = 1
+        label_result = []
+        for l in label:
+            base = [0 for _ in range(num_classes)]
+            base[l] = 1
+            label_result.append(base)
 
-        # label_ = [0 for _ in range(n_class)]
-        # label_[label] = 1
+        # label_result = [0 for _ in range(num_classes)]
+        # if isinstance(label, list):
+        #     for l in label:
+        #         label_result[l] = 1
+        # else:
+        #     label_result[label] = 1
 
         return label_result
 
