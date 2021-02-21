@@ -14,7 +14,7 @@ def yolo_pretrain_custom_loss(predict, target):
     return loss
 
 
-def yolov2_custom_loss_1(predict, target, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):
+def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):
     """
     :param predict: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
     :param target: tensor, [batch, height, width, (cy, cx, h, w, p)]
@@ -29,6 +29,7 @@ def yolov2_custom_loss_1(predict, target, num_bbox_predict, num_classes, lambda_
 
     pred = predict.reshape(NUM_BATCH, -1, 5 + num_classes)
     tar = target.reshape(NUM_BATCH, -1, 5 + num_classes)
+    anc = anchor_boxes.reshape(-1, 4).unsqueeze(0)
 
     # obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
 
@@ -44,15 +45,15 @@ def yolov2_custom_loss_1(predict, target, num_bbox_predict, num_classes, lambda_
 
     pred_y1 = pred_bboxes[:, :, 0] - .5 * pred_bboxes[:, :, 2]
     pred_x1 = pred_bboxes[:, :, 1] - .5 * pred_bboxes[:, :, 3]
-    pred_y2 = pred_bboxes[:, :, 0] + pred_bboxes[:, :, 2]
-    pred_x2 = pred_bboxes[:, :, 1] + pred_bboxes[:, :, 3]
+    pred_y2 = pred_bboxes[:, :, 0] + pred_bboxes[:, :, 2] * anc[:, :, 2]
+    pred_x2 = pred_bboxes[:, :, 1] + pred_bboxes[:, :, 3] * anc[:, :, 3]
 
     pred_bboxes = torch.cat([pred_y1.unsqueeze(2), pred_x1.unsqueeze(2), pred_y2.unsqueeze(2), pred_x2.unsqueeze(2)], dim=2)
 
     tar_y1 = tar_bboxes[:, :, 0] - .5 * tar_bboxes[:, :, 2]
     tar_x1 = tar_bboxes[:, :, 1] - .5 * tar_bboxes[:, :, 3]
-    tar_y2 = tar_bboxes[:, :, 0] + tar_bboxes[:, :, 2]
-    tar_x2 = tar_bboxes[:, :, 1] + tar_bboxes[:, :, 3]
+    tar_y2 = tar_bboxes[:, :, 0] + tar_bboxes[:, :, 2] * anc[:, :, 2]
+    tar_x2 = tar_bboxes[:, :, 1] + tar_bboxes[:, :, 3] * anc[:, :, 3]
 
     tar_bboxes = torch.cat([tar_y1.unsqueeze(2), tar_x1.unsqueeze(2), tar_y2.unsqueeze(2), tar_x2.unsqueeze(2)], dim=2)
 
@@ -97,8 +98,9 @@ def yolov2_custom_loss_1(predict, target, num_bbox_predict, num_classes, lambda_
     loss_coord *= lambda_coord * obj_responsible_mask.reshape(NUM_BATCH, -1)
 
     # Get confidence loss(2)
-    loss_confidence = torch.square(pred[:, :, 4] - tar[:, :, 4]) + \
-                      lambda_noobj * no_obj_responsible_mask.reshape(NUM_BATCH, -1) * torch.square(pred[:, :, 4] - tar[:, :, 4])
+    loss_confidence = torch.square(pred[:, :, 4] - tar[:, :, 4] * ious.reshape(NUM_BATCH, -1)) + \
+                      lambda_noobj * no_obj_responsible_mask.reshape(NUM_BATCH, -1) * \
+                      torch.square(pred[:, :, 4] - tar[:, :, 4] * ious.reshape(NUM_BATCH, -1))
 
     # Get class loss(3)
     loss_class = torch.square(pred[:, :, 5:] - tar[:, :, 5:])

@@ -52,11 +52,18 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     num_data_per_box = int(deltas.shape[2] / num_anchor_boxes)
 
     for i in range(num_anchor_boxes):
+        # out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
+        #     sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2]) + \
+        #     anchor_boxes[:, :, 4 * i:4 * i + 2]
+        # out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]) * \
+        #                              anchor_boxes[:, :, 4 * i + 2:4 * (i + 1)]
+        # out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
+        # out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
+        #     softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
         out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
-            sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2]) + \
-            anchor_boxes[:, :, 4 * i:4 * i + 2]
-        out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]) * \
-                                     anchor_boxes[:, :, 4 * i + 2:4 * (i + 1)]
+            sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2])
+        out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(
+            deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
             softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
@@ -109,9 +116,10 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
 #     return target
 
 
-def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_class, in_size, out_size):
+def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_predict, n_class, in_size, out_size):
     """
     :param ground_truth_boxes: tensor, [num ground truth, (y1, x1, y2, x2)]
+    :param anchor_boxes: tensor, [height, width, (cy, cx, h, w)]
     :param labels: tensor, [num bounding boxes, (p0, p1, ..., pn)]
     :param n_bbox_predict: int
     :param n_class: int
@@ -121,9 +129,9 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_clas
     :return: tensor, [height of output, width of output, (cy, cx, h, w, p) * num bounding boxes]
     """
 
-    bboxes = ground_truth_boxes
+    gt_bboxes = ground_truth_boxes
 
-    n_gt = len(bboxes)
+    n_gt = len(gt_bboxes)
     in_h, in_w = in_size
     out_h, out_w = out_size
 
@@ -133,15 +141,18 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, labels, n_bbox_predict, n_clas
     target = torch.zeros((out_h, out_w, (5 + n_class) * n_bbox_predict))
 
     for i in range(n_gt):
-        bbox = bboxes[i]
-        h, w = (bbox[2] - bbox[0]), (bbox[3] - bbox[1])  # Height, width is relative to original image
-        y, x = (bbox[0] + .5 * h) * ratio_y, (bbox[1] + .5 * w) * ratio_x
+        gt = gt_bboxes[i]
+        h_gt, w_gt = (gt[2] - gt[0]), (gt[3] - gt[1])  # Height, width is relative to original image
+        y_gt, x_gt = (gt[0] + .5 * h_gt) * ratio_y, (gt[1] + .5 * w_gt) * ratio_x
 
-        h, w = h * ratio_y, w * ratio_x
+        h_gt, w_gt = h_gt * ratio_y, w_gt * ratio_x
 
-        y_cell_idx, x_cell_idx = int(y), int(x)
-        y_cell, x_cell = y - int(y), x - int(x)
+        y_cell_idx, x_cell_idx = int(y_gt), int(x_gt)
+        y_cell, x_cell = y_gt - int(y_gt), x_gt - int(x_gt)
         label = labels[i]
+
+        h_anc, w_anc = anchor_boxes[y_cell_idx, x_cell_idx, 2:4]
+        h, w = h_gt / h_anc, w_gt / w_anc
 
         for j in range(n_bbox_predict):
             target[y_cell_idx, x_cell_idx, (5 + n_class) * j] = x_cell

@@ -25,9 +25,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--lr', type=float, required=False, default=.0003)
     parser.add_argument('--weight_decay', type=float, required=False, default=0)
-    parser.add_argument('--momentum', type=float, required=False, default=0)
+    parser.add_argument('--momentum', type=float, required=False, default=.9)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -101,7 +101,8 @@ if __name__ == '__main__':
     model_name = 'yolov2mobile'
     anchor_box_samples = torch.Tensor([[1.19, 1.08], [4.41, 3.42], [11.38, 6.63], [5.11, 9.42], [10.52, 16.62]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
-    state_dict_pth = None
+    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_26epoch_0.001lr_3.36653loss.pth'
+    # state_dict_pth = None
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
 
@@ -159,6 +160,7 @@ if __name__ == '__main__':
 
                 predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
                 y_list.append(get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
+                                                        anchor_boxes=anchor_box_base,
                                                         labels=label,
                                                         n_bbox_predict=5,
                                                         n_class=num_classes,
@@ -168,10 +170,16 @@ if __name__ == '__main__':
             y = make_batch(y_list).to(device)
             predict = make_batch(predict_list).to(device)
 
+            # for idx1 in range(13):
+            #     for idx2 in range(13):
+            #         for idx3 in range(5):
+            #             print('Predict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #             print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+
             del predict_temp, predict_list, y_list
 
             optimizer.zero_grad()
-            loss = loss_func(predict=predict, target=y, num_bbox_predict=5, num_classes=num_classes)
+            loss = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
             loss.backward()
             optimizer.step()
 
@@ -225,6 +233,7 @@ if __name__ == '__main__':
                     predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
                     y_list.append(get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
                                                             labels=label,
+                                                            anchor_boxes=anchor_box_base,
                                                             n_bbox_predict=5,
                                                             n_class=num_classes,
                                                             in_size=(h_img, w_img),
@@ -235,7 +244,7 @@ if __name__ == '__main__':
 
                 del predict_temp, predict_list, y_list
 
-                loss = loss_func(predict=predict, target=y, num_bbox_predict=5, num_classes=num_classes)
+                loss = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
 
                 val_loss += loss.detach().cpu().item()
 

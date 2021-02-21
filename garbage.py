@@ -26,30 +26,9 @@ import matplotlib.pyplot as plt
 # plt.imshow(img)
 # plt.show()
 
-a = torch.Tensor([[[1, 2, 3],
-                   [4, 5, 6],
-                   [7, 8, 9]],
-                  [[33, 22, 11],
-                   [44, 66, 55],
-                   [77, 88, 99]]])
-
-idx = torch.max(a, dim=2).indices
-# [0, 0, 0, 1, 1, 1] [0, 1, 2, 0, 1, 2] [2, 2, 2, 0, 1, 2]
-
-idx1 = []
-for i in range(idx.shape[0]):
-    idx1 += [i for _ in range(idx.shape[1])]
-
-idx2 = []
-for i in range(idx.shape[0]):
-    idx2 += [j for j in range(idx.shape[1])]
-
-idx3 = idx.reshape(-1).squeeze()
-
-print(a[idx1, idx2, idx3])
-temp = torch.zeros(6)
-a[idx1, idx2, idx3] = temp
-print(a)
+a = torch.Tensor([[1.23, 2.35], [4.23, 5.26]])
+b = torch.Tensor([[1, 2]])
+print(a * b)
 
 
 
