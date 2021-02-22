@@ -38,7 +38,7 @@ if __name__ == '__main__':
     momentum = args.momentum
     num_epochs = args.num_epochs
 
-    model_save_term = 2
+    model_save_term = 1
 
     # Generate COCO dataset
     # dset_name = 'coco2017'
@@ -116,6 +116,10 @@ if __name__ == '__main__':
     pred_dummy = model(dummy)
 
     anchor_box_base = get_output_anchor_box_tensor(anchor_box_sizes=anchor_box_samples, out_size=pred_dummy.shape[1:3]).to(device)
+    # for idx1 in range(13):
+    #     for idx2 in range(13):
+    #         for idx3 in range(5):
+    #             print(f'({idx1}, {idx2}, {idx3}) {anchor_box_base[idx1, idx2, 4 * idx3:4 * (idx3 + 1)]}')
 
     train_loss_list = []
     val_loss_list = []
@@ -143,7 +147,12 @@ if __name__ == '__main__':
 
             for b in range(len(anns)):
                 ground_truth_box = anns[b]['bbox']
-                label = anns[b]['label']
+                label_categorical = anns[b]['label_categorical']
+                fn = anns[b]['filename']
+                name = anns[b]['name']
+                label_int = anns[b]['label']
+
+                # print(f'{label_int} {label_categorical} {name} {fn} {ground_truth_box / 32}')
 
                 h_img, w_img = 416, 416
                 ratio_y, ratio_x = 1 / 32, 1 / 32
@@ -159,13 +168,14 @@ if __name__ == '__main__':
                 #     ground_truth_box[:, 3] *= ratio_w
 
                 predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
-                y_list.append(get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
-                                                        anchor_boxes=anchor_box_base,
-                                                        labels=label,
-                                                        n_bbox_predict=5,
-                                                        n_class=num_classes,
-                                                        in_size=(h_img, w_img),
-                                                        out_size=(13, 13)))
+                y_temp = get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,
+                                                    anchor_boxes=anchor_box_base,
+                                                    labels=label_categorical,
+                                                    n_bbox_predict=5,
+                                                    n_class=num_classes,
+                                                    in_size=(h_img, w_img),
+                                                    out_size=(13, 13))
+                y_list.append(y_temp)
 
             y = make_batch(y_list).to(device)
             predict = make_batch(predict_list).to(device)
@@ -173,10 +183,11 @@ if __name__ == '__main__':
             # for idx1 in range(13):
             #     for idx2 in range(13):
             #         for idx3 in range(5):
-            #             print('Predict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
-            #             print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #             if y[0, idx1, idx2, 25 * idx3] != 0:
+            #                 print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #                 print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
 
-            del predict_temp, predict_list, y_list
+            del predict_temp, predict_list, y_list, y_temp
 
             optimizer.zero_grad()
             loss = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
@@ -206,6 +217,8 @@ if __name__ == '__main__':
         with torch.no_grad():
             model.eval()
             val_loss = 0
+            num_batches = 0
+
             for i, (imgs, anns) in enumerate(val_loader):
                 num_batches += 1
 
@@ -218,7 +231,7 @@ if __name__ == '__main__':
                 for b in range(len(anns)):
                     h_img, w_img = 416, 416
                     ground_truth_box = anns[b]['bbox']
-                    label = anns[b]['label']
+                    label = anns[b]['label_categorical']
 
                     ratio_h, ratio_w = 1 / 32, 1 / 32
                     ground_truth_box = torch.as_tensor(ground_truth_box)

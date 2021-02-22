@@ -1,5 +1,7 @@
 import torch
 
+from utils.pytorch_util import calculate_iou
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
@@ -15,11 +17,11 @@ def get_output_anchor_box_tensor(anchor_box_sizes, out_size):
     out = torch.zeros(out_size[0], out_size[1], 4 * len(anchor_box_sizes)).to(device)
     cy_ones = torch.ones(1, out_size[1])
     cx_ones = torch.ones(out_size[0], 1)
-    cy_tensor = torch.zeros(1, out_size[1])
-    cx_tensor = torch.zeros(out_size[0], 1)
+    cy_tensor = torch.zeros(1, out_size[1]) + .5
+    cx_tensor = torch.zeros(out_size[0], 1) + .5
     for i in range(1, out_size[0]):
-        cy_tensor = torch.cat([cy_tensor, cy_ones * i], dim=0)
-        cx_tensor = torch.cat([cx_tensor, cx_ones * i], dim=1)
+        cy_tensor = torch.cat([cy_tensor, cy_ones * i + .5], dim=0)
+        cx_tensor = torch.cat([cx_tensor, cx_ones * i + .5], dim=1)
 
     ctr_tensor = torch.cat([cy_tensor.unsqueeze(2), cx_tensor.unsqueeze(2)], dim=2)
 
@@ -39,7 +41,7 @@ def get_output_anchor_box_tensor(anchor_box_sizes, out_size):
 def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     """
     :param deltas: tensor, [height, width, ((dy, dx, dh, dw, p) + class scores) * num anchor boxes]
-    :param anchor_boxes: tensor, [height, width, (cx, cy, h, w) * num anchor boxes]
+    :param anchor_boxes: tensor, [height, width, (cy, cx, h, w) * num anchor boxes]
 
     :return: tensor, [height, width, ((cy, cx, h, w, p) + class scores) * num anchor boxes]
     """
@@ -119,7 +121,7 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
 def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_predict, n_class, in_size, out_size):
     """
     :param ground_truth_boxes: tensor, [num ground truth, (y1, x1, y2, x2)]
-    :param anchor_boxes: tensor, [height, width, (cy, cx, h, w)]
+    :param anchor_boxes: tensor, [height, width, (cy, cx, h, w) * num bounding boxes]
     :param labels: tensor, [num bounding boxes, (p0, p1, ..., pn)]
     :param n_bbox_predict: int
     :param n_class: int
@@ -147,20 +149,42 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
 
         h_gt, w_gt = h_gt * ratio_y, w_gt * ratio_x
 
-        y_cell_idx, x_cell_idx = int(y_gt), int(x_gt)
-        y_cell, x_cell = y_gt - int(y_gt), x_gt - int(x_gt)
+        y_idx, x_idx = int(y_gt), int(x_gt)
+        y, x = y_gt - int(y_gt), x_gt - int(x_gt)
         label = labels[i]
 
-        h_anc, w_anc = anchor_boxes[y_cell_idx, x_cell_idx, 2:4]
+        # h_anc, w_anc = anchor_boxes[y_idx, x_idx, 2:4]
+        # h, w = h_gt / h_anc, w_gt / w_anc
+
+        iou_gt_anchor_list = []
+        for j in range(n_bbox_predict):
+            # target[y_idx, x_idx, (5 + n_class) * j] = x
+            # target[y_idx, x_idx, (5 + n_class) * j + 1] = y
+            # target[y_idx, x_idx, (5 + n_class) * j + 2] = w
+            # target[y_idx, x_idx, (5 + n_class) * j + 3] = h
+            # target[y_idx, x_idx, (5 + n_class) * j + 4] = 1
+            # target[y_idx, x_idx, (5 + n_class) * j + 5:(5 + n_class) * (j + 1)] = label
+
+            cy_anc, cx_anc, h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * j:4 * (j + 1)]
+            y1_anc = cy_anc - .5 * h_anc
+            x1_anc = cx_anc - .5 * w_anc
+            y2_anc = y1_anc + h_anc
+            x2_anc = x1_anc + w_anc
+            anc = torch.Tensor([y1_anc, x1_anc, y2_anc, x2_anc])
+
+            iou = calculate_iou(gt, anc)
+            iou_gt_anchor_list.append(iou.item())
+
+        anc_idx = iou_gt_anchor_list.index(max(iou_gt_anchor_list))
+
+        h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * anc_idx + 2:4 * (anc_idx + 1)]
         h, w = h_gt / h_anc, w_gt / w_anc
 
-        for j in range(n_bbox_predict):
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j] = x_cell
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j + 1] = y_cell
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j + 2] = w
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j + 3] = h
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j + 4] = 1
-
-            target[y_cell_idx, x_cell_idx, (5 + n_class) * j + 5:(5 + n_class) * (j + 1)] = label
+        target[y_idx, x_idx, (5 + n_class) * anc_idx] = y
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
 
     return target

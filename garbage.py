@@ -26,9 +26,10 @@ import matplotlib.pyplot as plt
 # plt.imshow(img)
 # plt.show()
 
-a = torch.Tensor([[1.23, 2.35], [4.23, 5.26]])
-b = torch.Tensor([[1, 2]])
-print(a * b)
+t_h = 2.4798
+h_anc = 1.19
+print(t_h * h_anc)
+
 
 
 

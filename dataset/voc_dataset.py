@@ -72,6 +72,7 @@ class VOCDataset(data.Dataset):
             objs = ann.findall('object')
             labels = []
             bboxes = []
+            names = []
             for obj in objs:
                 name = obj.find('name').text
                 bbox = obj.find('bndbox')
@@ -85,18 +86,26 @@ class VOCDataset(data.Dataset):
                 #     class_ = self.to_categorical(class_, self.num_classes)
                 #     class_ = torch.as_tensor(class_)
 
-                bbox = torch.as_tensor([ymin, xmin, ymax, xmax])
+                bbox = [ymin, xmin, ymax, xmax]
 
                 labels.append(label)
                 bboxes.append(bbox)
+                names.append(name)
 
             if self.is_categorical:
-                labels = self.to_categorical(labels, self.num_classes)
+                labels_categorical = self.to_categorical(labels, self.num_classes)
+                labels_categorical = torch.as_tensor(labels_categorical)
 
             labels = torch.as_tensor(labels, dtype=torch.int64)
-            bboxes = torch.as_tensor(bbox, dtype=torch.float32)
+            bboxes = torch.as_tensor(bboxes, dtype=torch.float32)
 
-            ann = {'label': labels, 'bbox': bboxes, 'filename': img_fn}
+            ann = {}
+            ann['label'] = labels
+            ann['bbox'] = bboxes
+            ann['name'] = names
+            ann['filename'] = img_fn
+            if self.is_categorical:
+                ann['label_categorical'] = labels_categorical
 
             return img, ann
 

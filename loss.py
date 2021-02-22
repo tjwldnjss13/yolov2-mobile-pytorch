@@ -18,6 +18,7 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     """
     :param predict: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
     :param target: tensor, [batch, height, width, (cy, cx, h, w, p)]
+    :param anchor_boxes: tensor, [height, width, (y, x, h, w)]
     :param num_bbox_predict: int
     :param num_classes: int
     :param lambda_coord: float
@@ -29,7 +30,7 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
 
     pred = predict.reshape(NUM_BATCH, -1, 5 + num_classes)
     tar = target.reshape(NUM_BATCH, -1, 5 + num_classes)
-    anc = anchor_boxes.reshape(-1, 4).unsqueeze(0)
+    anc = anchor_boxes.reshape(-1, 4)
 
     # obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
 
@@ -43,25 +44,36 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     tar_bboxes = tar[:, :, :4]
     tar_probs = tar[:, :, 4]  # [num batch, h * w * 5(num predict bbox)]
 
-    pred_y1 = pred_bboxes[:, :, 0] - .5 * pred_bboxes[:, :, 2]
-    pred_x1 = pred_bboxes[:, :, 1] - .5 * pred_bboxes[:, :, 3]
-    pred_y2 = pred_bboxes[:, :, 0] + pred_bboxes[:, :, 2] * anc[:, :, 2]
-    pred_x2 = pred_bboxes[:, :, 1] + pred_bboxes[:, :, 3] * anc[:, :, 3]
+    # pred_y1 = pred_bboxes[:, :, 0] - .5 * pred_bboxes[:, :, 2]
+    # pred_x1 = pred_bboxes[:, :, 1] - .5 * pred_bboxes[:, :, 3]
+    # pred_y2 = pred_bboxes[:, :, 0] + pred_bboxes[:, :, 2] * anc[:, :, 2]
+    # pred_x2 = pred_bboxes[:, :, 1] + pred_bboxes[:, :, 3] * anc[:, :, 3]
+    pred_y = pred_bboxes[:, :, 0] + anc[:, 0]
+    pred_x = pred_bboxes[:, :, 1] + anc[:, 1]
+    pred_h = pred_bboxes[:, :, 2] * anc[:, 2]
+    pred_w = pred_bboxes[:, :, 3] * anc[:, 3]
+
+    pred_y1 = pred_y - .5 * pred_h
+    pred_x1 = pred_x - .5 * pred_w
+    pred_y2 = pred_y + pred_h
+    pred_x2 = pred_x + pred_w
 
     pred_bboxes = torch.cat([pred_y1.unsqueeze(2), pred_x1.unsqueeze(2), pred_y2.unsqueeze(2), pred_x2.unsqueeze(2)], dim=2)
 
     tar_y1 = tar_bboxes[:, :, 0] - .5 * tar_bboxes[:, :, 2]
     tar_x1 = tar_bboxes[:, :, 1] - .5 * tar_bboxes[:, :, 3]
-    tar_y2 = tar_bboxes[:, :, 0] + tar_bboxes[:, :, 2] * anc[:, :, 2]
-    tar_x2 = tar_bboxes[:, :, 1] + tar_bboxes[:, :, 3] * anc[:, :, 3]
+    tar_y2 = tar_bboxes[:, :, 0] + tar_bboxes[:, :, 2] * anc[:, 2]
+    tar_x2 = tar_bboxes[:, :, 1] + tar_bboxes[:, :, 3] * anc[:, 3]
 
     tar_bboxes = torch.cat([tar_y1.unsqueeze(2), tar_x1.unsqueeze(2), tar_y2.unsqueeze(2), tar_x2.unsqueeze(2)], dim=2)
 
     indices_valid = torch.where(tar_probs == 1)
-    pred_bboxes_valid = pred_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
-    tar_bboxes_valid = tar_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
+    # pred_bboxes_valid = pred_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
+    # tar_bboxes_valid = tar_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
+    pred_bboxes_valid = pred_bboxes[indices_valid].reshape(-1, 4)
+    tar_bboxes_valid = tar_bboxes[indices_valid].reshape(-1, 4)
 
-    ious_valid = calculate_iou(pred_bboxes_valid, tar_bboxes_valid, dim=2).reshape(-1)
+    ious_valid = calculate_iou(pred_bboxes_valid, tar_bboxes_valid, dim=1).reshape(-1)
 
     ious = torch.zeros(NUM_BATCH, H * W * 5).to(device)  # [num batch, h * w * 5(num predict bbox)]
     ious[indices_valid] = ious_valid
