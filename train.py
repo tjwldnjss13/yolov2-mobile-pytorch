@@ -99,7 +99,11 @@ if __name__ == '__main__':
 
     # Load model
     model_name = 'yolov2mobile'
-    anchor_box_samples = torch.Tensor([[1.19, 1.08], [4.41, 3.42], [11.38, 6.63], [5.11, 9.42], [10.52, 16.62]])
+    anchor_box_samples = torch.Tensor([[1.73145, 1.3221],
+                                       [4.00944, 3.19275],
+                                       [8.09892, 5.05587], 
+                                       [9.47112, 4.84053],
+                                       [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
     # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_48epoch_1e-07lr_18.53759loss_7.92858losscoord_0.42877lossconf_10.18024losscls.pth'
