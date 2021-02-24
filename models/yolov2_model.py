@@ -20,7 +20,7 @@ class YOLOV2Mobile(nn.Module):
         self.anchor_box_samples = anchor_box_samples
 
         self.feature_model = Darknet19DS()
-        self.reg_layer = DSConv(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0)
+        self.reg_layer = DSConv(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0, 'sigmoid')
 
         # self.anchor_boxes = self._get_valid_anchor_boxes()
 

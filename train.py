@@ -25,8 +25,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.0003)
-    parser.add_argument('--weight_decay', type=float, required=False, default=0)
+    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.01)
     parser.add_argument('--momentum', type=float, required=False, default=.9)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
@@ -101,14 +101,15 @@ if __name__ == '__main__':
     model_name = 'yolov2mobile'
     anchor_box_samples = torch.Tensor([[1.19, 1.08], [4.41, 3.42], [11.38, 6.63], [5.11, 9.42], [10.52, 16.62]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
-    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_26epoch_0.001lr_3.36653loss.pth'
-    # state_dict_pth = None
+    state_dict_pth = None
+    # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_48epoch_1e-07lr_18.53759loss_7.92858losscoord_0.42877lossconf_10.18024losscls.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
 
     # Define optimizer, loss function
     optimizer = optim.Adam(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
+    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum, nesterov=True)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=.9)
     loss_func = yolo_custom_loss
 
     # Define anchor box configuration
@@ -122,7 +123,13 @@ if __name__ == '__main__':
     #             print(f'({idx1}, {idx2}, {idx3}) {anchor_box_base[idx1, idx2, 4 * idx3:4 * (idx3 + 1)]}')
 
     train_loss_list = []
+    train_loss_coord_list = []
+    train_loss_confidence_list = []
+    train_loss_class_list = []
     val_loss_list = []
+    val_loss_coord_list = []
+    val_loss_confidence_list = []
+    val_loss_class_list = []
     model.train()
 
     t_start = time.time()
@@ -130,6 +137,9 @@ if __name__ == '__main__':
         num_batches = 0
         num_datas = 0
         train_loss = 0
+        train_loss_coord = 0
+        train_loss_confidence = 0
+        train_loss_class = 0
 
         t_train_start = time.time()
         for i, (imgs, anns) in enumerate(train_loader):
@@ -190,33 +200,53 @@ if __name__ == '__main__':
             del predict_temp, predict_list, y_list, y_temp
 
             optimizer.zero_grad()
-            loss = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
+            loss, loss_coord, loss_confidence, loss_class = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
             loss.backward()
             optimizer.step()
 
             train_loss += loss.detach().cpu().item()
+            train_loss_coord += loss_coord.detach().cpu().item()
+            train_loss_confidence += loss_confidence.detach().cpu().item()
+            train_loss_class += loss_class.detach().cpu().item()
 
             t_batch_end = time.time()
 
             H, M, S = time_calculator(t_batch_end - t_start)
 
-            print('<loss> {:<21} <loss_avg> {:<21} '.format(loss.detach().cpu().item(), train_loss / num_batches), end='')
+            print('<loss> {: <10.5f}  <loss_coord> {: <10.5f}  <loss_confidence> {: <10.5f}  <loss_class> {: <10.5f}  '.format(
+                loss.detach().cpu().item(), loss_coord.detach().cpu().item(),
+                loss_confidence.detach().cpu().item(), loss_class.detach().cpu().item()), end='')
+            print('<loss_avg> {: <10.5f}  <loss_coord_avg> {: <10.5f}  <loss_confidence_avg> {: <10.5f}  <loss_class_avg> {: <10.5f}  '.format(
+                train_loss / num_batches, train_loss_coord / num_batches, train_loss_confidence / num_batches,
+                train_loss_class / num_batches
+            ), end='')
             print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
 
             del x, y, predict, loss
 
         train_loss /= num_batches
+        train_loss_coord /= num_batches
+        train_loss_confidence /= num_batches
+        train_loss_class /= num_batches
+
         train_loss_list.append(train_loss)
+        train_loss_coord_list.append(train_loss_coord)
+        train_loss_confidence_list.append(train_loss_confidence)
+        train_loss_class_list.append(train_loss_class)
 
         t_train_end = time.time()
         H, M, S = time_calculator(t_train_end - t_train_start)
 
-        print('        <train_loss> {:<21} '.format(train_loss_list[-1]), end='')
+        print('        <train_loss> {: <10.5f}  <train_loss_coord> {: <10.5f}  <train_loss_confidence> {: <10.5f}  <train_loss_class> {: <10.5f}  '.format(
+            train_loss_list[-1], train_loss_coord_list[-1], train_loss_confidence_list[-1], train_loss_class_list[-1]), end='')
         print('<time> {:02d}:{:02d}:{:02d} '.format(int(H), int(M), int(S)))
 
         with torch.no_grad():
             model.eval()
             val_loss = 0
+            val_loss_coord = 0
+            val_loss_confidence = 0
+            val_loss_class = 0
             num_batches = 0
 
             for i, (imgs, anns) in enumerate(val_loader):
@@ -257,19 +287,32 @@ if __name__ == '__main__':
 
                 del predict_temp, predict_list, y_list
 
-                loss = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
+                loss, loss_coord, loss_confidence, loss_class = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
 
                 val_loss += loss.detach().cpu().item()
+                val_loss_coord += loss_coord.detach().cpu().item()
+                val_loss_confidence += loss_confidence.detach().cpu().item()
+                val_loss_class += loss_class.detach().cpu().item()
 
                 del x, y, predict, loss
 
             val_loss /= num_batches
-            val_loss_list.append(val_loss)
+            val_loss_coord /= num_batches
+            val_loss_confidence /= num_batches
+            val_loss_class /= num_batches
 
-            print('        <val_loss> {:<21}'.format(val_loss_list[-1]))
+            val_loss_list.append(val_loss)
+            val_loss_coord_list.append(val_loss_coord)
+            val_loss_confidence_list.append(val_loss_confidence)
+            val_loss_class_list.append(val_loss_class)
+
+            print('        <val_loss> {: <10.5f}  <val_loss_coord> {: <10.5f}  <val_loss_confidence> {: <10.5f}  <val_loss_class> {: <10.5f}'.format(
+                val_loss_list[-1], val_loss_coord_list[-1], val_loss_confidence_list[-1], val_loss_class_list[-1]))
 
             if (e + 1) % model_save_term == 0:
-                save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss.pth'.format(model_name, dset_name, e + 1, learning_rate, val_loss_list[-1])
+                save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss_{:.5f}losscoord_{:.5f}lossconf_{:.5f}losscls.pth'.format(
+                    model_name, dset_name, e + 1, learning_rate, val_loss_list[-1], val_loss_coord_list[-1],
+                    val_loss_confidence_list[-1], val_loss_class_list[-1])
                 torch.save(model.state_dict(), save_pth)
 
     x_axis = [i for i in range(num_epochs)]

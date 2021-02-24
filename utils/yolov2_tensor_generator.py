@@ -49,6 +49,7 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     out = torch.zeros(deltas.shape).to(device)
     sigmoid = torch.nn.Sigmoid()
     softmax = torch.nn.Softmax(dim=2)
+    tanh = torch.nn.Tanh()
 
     num_anchor_boxes = int(anchor_boxes.shape[2] / 5)
     num_data_per_box = int(deltas.shape[2] / num_anchor_boxes)
@@ -65,10 +66,12 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
         out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
             sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2])
         out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(
-            deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4])
+            (deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]))
         out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
-            softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
+            sigmoid(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
+            # softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
+
 
     return out
 
@@ -172,7 +175,9 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
             x2_anc = x1_anc + w_anc
             anc = torch.Tensor([y1_anc, x1_anc, y2_anc, x2_anc])
 
-            iou = calculate_iou(gt, anc)
+            # print(f'GT: {gt / 32}, ANC: {anc}')
+
+            iou = calculate_iou(gt / 32, anc)
             iou_gt_anchor_list.append(iou.item())
 
         anc_idx = iou_gt_anchor_list.index(max(iou_gt_anchor_list))
@@ -184,7 +189,9 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
+
+        # print(iou_gt_anchor_list[anc_idx])
 
     return target

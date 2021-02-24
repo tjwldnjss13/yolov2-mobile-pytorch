@@ -121,10 +121,12 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     loss_class *= responsible_mask.reshape(NUM_BATCH, -1)
 
     # Sum up all the losses
-    loss = loss_coord.sum() + loss_confidence.sum() + loss_class.sum()
-    # print(loss_coord.sum().detach().cpu().item(), loss_confidence.sum().detach().cpu().item(), loss_class.sum().detach().cpu().item())
+    loss_coord = loss_coord.sum() / NUM_BATCH
+    loss_confidence = loss_confidence.sum() / NUM_BATCH
+    loss_class = loss_class.sum() / NUM_BATCH
+    loss = loss_coord + loss_confidence + loss_class
 
-    return loss / NUM_BATCH
+    return loss, loss_coord, loss_confidence, loss_class
 
 
 def yolov2_custom_loss_2(predict, target, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):

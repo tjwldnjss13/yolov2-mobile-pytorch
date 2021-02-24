@@ -2,14 +2,19 @@ import torch.nn as nn
 
 
 class DSConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, use_activation=False, use_batch_norm=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, activation='relu', use_batch_norm=False):
         super(DSConv, self).__init__()
-        self.use_activation = use_activation
         self.use_batch_norm = use_batch_norm
         self.dconv = DConv(in_channels, kernel_size, stride, padding)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
-        if use_activation:
-            self.relu6 = nn.ReLU6(True)
+        if activation == 'relu':
+            self.activation = nn.ReLU(True)
+        elif activation == 'leaky_relu':
+            self.activation = nn.LeakyReLU(inplace=True)
+        elif activation == 'relu6':
+            self.activation = nn.ReLU6(True)
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
         if use_batch_norm:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(out_channels)
@@ -30,13 +35,11 @@ class DSConv(nn.Module):
         x = self.dconv(x)
         if self.use_batch_norm:
             x = self.bn1(x)
-        if self.use_activation:
-            x = self.relu6(x)
+        x = self.activation(x)
         x = self.conv1x1(x)
         if self.use_batch_norm:
             x = self.bn2(x)
-        if self.use_activation:
-            x = self.relu6(x)
+        x = self.activation(x)
 
         return x
 
