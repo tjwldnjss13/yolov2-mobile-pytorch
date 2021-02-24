@@ -26,8 +26,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--lr', type=float, required=False, default=.001)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.01)
-    parser.add_argument('--momentum', type=float, required=False, default=.9)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.001)
+    parser.add_argument('--momentum', type=float, required=False, default=.7)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -101,8 +101,8 @@ if __name__ == '__main__':
     model_name = 'yolov2mobile'
     anchor_box_samples = torch.Tensor([[1.73145, 1.3221],
                                        [4.00944, 3.19275],
-                                       [8.09892, 5.05587], 
-                                       [9.47112, 4.84053],
+                                       [8.09892, 5.05587],
+                                       [4.84053, 9.47112],
                                        [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
     # Define optimizer, loss function
     optimizer = optim.Adam(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum, nesterov=True)
+    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=.9)
     loss_func = yolo_custom_loss
 
@@ -173,13 +173,6 @@ if __name__ == '__main__':
                 ground_truth_box = torch.as_tensor(ground_truth_box)
                 if len(ground_truth_box.shape) < 2:
                     ground_truth_box = ground_truth_box.unsqueeze(0)
-                # if len(ground_truth_box) > 0:
-                #     ground_truth_box[:, 0] *= ratio_h
-                #     ground_truth_box[:, 0] -= ground_truth_box[:, 0].int()
-                #     ground_truth_box[:, 1] *= ratio_w
-                #     ground_truth_box[:, 1] -= ground_truth_box[:, 1].int()
-                #     ground_truth_box[:, 2] *= ratio_h
-                #     ground_truth_box[:, 3] *= ratio_w
 
                 predict_list.append(get_yolo_v2_output_tensor(predict_temp[b], anchor_box_base))
                 y_temp = get_yolo_v2_target_tensor(ground_truth_boxes=ground_truth_box,

@@ -26,9 +26,25 @@ import matplotlib.pyplot as plt
 # plt.imshow(img)
 # plt.show()
 
-t_h = 2.4798
-h_anc = 1.19
-print(t_h * h_anc)
+from torchsummary import summary
+from models.dsconv import DSConv
+
+
+class SimpleModel(torch.nn.Module):
+    def __init__(self):
+        super(SimpleModel, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, 3, 1, 1)
+        self.conv2 = DSConv(3, 32, 3, 1, 1)
+
+    def forward(self, x):
+        x = self.conv1(x)
+
+        return x
+
+
+model = SimpleModel().cuda()
+summary(model, (3, 416, 416))
+
 
 
 

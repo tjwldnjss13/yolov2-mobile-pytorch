@@ -69,8 +69,7 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
             (deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]))
         out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
-            sigmoid(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
-            # softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
+            softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
 
 
     return out
