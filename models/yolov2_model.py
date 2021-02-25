@@ -44,5 +44,5 @@ class YOLOV2Mobile(nn.Module):
 
 if __name__ == '__main__':
     from torchsummary import summary
-    model = YOLOV2Mobile((416, 416), 91, torch.Tensor([[20, 30], [10, 40]])).cuda()
+    model = YOLOV2Mobile((416, 416), 20, torch.Tensor([[20, 30], [10, 40]])).cuda()
     summary(model, (3, 416, 416))

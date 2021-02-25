@@ -33,11 +33,19 @@ from models.dsconv import DSConv
 class SimpleModel(torch.nn.Module):
     def __init__(self):
         super(SimpleModel, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3, 1, 1)
-        self.conv2 = DSConv(3, 32, 3, 1, 1)
+        self.conv = nn.Conv2d(3, 32, 3, 1, 1)
+        self.activation = nn.LeakyReLU(.01, True)
+
+        self.layer = nn.Sequential(
+            nn.Conv2d(3, 32, 3, 1, 1),
+            self.activation,
+        )
 
     def forward(self, x):
-        x = self.conv1(x)
+        # x = self.conv(x)
+        # x = self.activation(x)
+
+        x = self.layer(x)
 
         return x
 
