@@ -50,8 +50,18 @@ class SimpleModel(torch.nn.Module):
         return x
 
 
-model = SimpleModel().cuda()
-summary(model, (3, 416, 416))
+if __name__ == '__main__':
+    a = torch.zeros(3, 3, 4)
+    num = 1
+    for i in range(3):
+        for j in range(3):
+            for m in range(4):
+                a[i, j, m] = num
+                num += 1
+
+    print(a)
+    a = a.reshape(a.shape[0], -1, 2)
+    print(a)
 
 
 

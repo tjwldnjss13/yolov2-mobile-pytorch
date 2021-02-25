@@ -20,8 +20,8 @@ def get_output_anchor_box_tensor(anchor_box_sizes, out_size):
     cy_tensor = torch.zeros(1, out_size[1]) + .5
     cx_tensor = torch.zeros(out_size[0], 1) + .5
     for i in range(1, out_size[0]):
-        cy_tensor = torch.cat([cy_tensor, cy_ones * i + .5], dim=0)
-        cx_tensor = torch.cat([cx_tensor, cx_ones * i + .5], dim=1)
+        cy_tensor = torch.cat([cy_tensor, cy_ones * i], dim=0)
+        cx_tensor = torch.cat([cx_tensor, cx_ones * i], dim=1)
 
     ctr_tensor = torch.cat([cy_tensor.unsqueeze(2), cx_tensor.unsqueeze(2)], dim=2)
 

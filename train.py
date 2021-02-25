@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     # Generate VOC dataset
     dset_name = 'voc2012'
-    root = 'C://DeepLearningData/VOC2012'
+    root = 'D://DeepLearningData/VOC2012'
 
     transform_og = transforms.Compose([transforms.Resize((416, 416)),
                                               transforms.ToTensor(),
@@ -121,10 +121,10 @@ if __name__ == '__main__':
     pred_dummy = model(dummy)
 
     anchor_box_base = get_output_anchor_box_tensor(anchor_box_sizes=anchor_box_samples, out_size=pred_dummy.shape[1:3]).to(device)
-    for idx1 in range(13):
-        for idx2 in range(13):
-            for idx3 in range(5):
-                print(f'({idx1}, {idx2}, {idx3}) {anchor_box_base[idx1, idx2, 4 * idx3:4 * (idx3 + 1)]}')
+    # for idx1 in range(13):
+    #     for idx2 in range(13):
+    #         for idx3 in range(5):
+    #             print(f'({idx1}, {idx2}, {idx3}) {anchor_box_base[idx1, idx2, 4 * idx3:4 * (idx3 + 1)]}')
 
     train_loss_list = []
     train_loss_coord_list = []
@@ -187,12 +187,12 @@ if __name__ == '__main__':
             y = make_batch(y_list).to(device)
             predict = make_batch(predict_list).to(device)
 
-            for idx1 in range(13):
-                for idx2 in range(13):
-                    for idx3 in range(5):
-                        if y[0, idx1, idx2, 25 * idx3] != 0:
-                            print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
-                            print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            # for idx1 in range(13):
+            #     for idx2 in range(13):
+            #         for idx3 in range(5):
+            #             if y[0, idx1, idx2, 25 * idx3] != 0:
+            #                 print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #                 print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
 
             del predict_temp, predict_list, y_list, y_temp
 

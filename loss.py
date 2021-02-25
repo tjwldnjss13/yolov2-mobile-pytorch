@@ -17,7 +17,7 @@ def yolo_pretrain_custom_loss(predict, target):
 def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):
     """
     :param predict: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
-    :param target: tensor, [batch, height, width, (cy, cx, h, w, p)]
+    :param target: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
     :param anchor_boxes: tensor, [height, width, (y, x, h, w)]
     :param num_bbox_predict: int
     :param num_classes: int
@@ -129,7 +129,7 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     return loss, loss_coord, loss_confidence, loss_class
 
 
-def yolov2_custom_loss_2(predict, target, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):
+def yolov2_custom_loss_2(predict, target, anchor_boxes, num_bbox_predict, num_classes, lambda_coord=5, lambda_noobj=.5):
     """
     :param predict: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
     :param target: tensor, [batch, height, width, (cy, cx, h, w, p) * num bounding boxes]
@@ -210,5 +210,5 @@ def yolov2_custom_loss_2(predict, target, num_bbox_predict, num_classes, lambda_
     loss = (coord_loss + confidence_loss + class_loss) / n_batch
     # print(coord_loss.detach().cpu().item(), confidence_loss.detach().cpu().item(), class_loss.detach().cpu().item())
 
-    return loss
+    return loss, coord_loss / n_batch, confidence_loss / n_batch, class_loss / n_batch
 
