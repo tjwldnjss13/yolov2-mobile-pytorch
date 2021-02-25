@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--lr', type=float, required=False, default=.0005)
     parser.add_argument('--weight_decay', type=float, required=False, default=.001)
     parser.add_argument('--momentum', type=float, required=False, default=.7)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
