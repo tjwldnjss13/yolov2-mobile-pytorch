@@ -14,6 +14,7 @@ from utils.pytorch_util import make_batch
 from utils.yolov2_tensor_generator import get_output_anchor_box_tensor, get_yolo_v2_output_tensor, get_yolo_v2_target_tensor
 # from dataset.coco_dataset import COCODataset, custom_collate_fn
 from dataset.voc_dataset import VOCDataset, custom_collate_fn
+from dataset.augment import GaussianNoise
 from models.yolov2_model import YOLOV2Mobile
 from loss import yolov2_custom_loss_1 as yolo_custom_loss
 
@@ -57,8 +58,17 @@ if __name__ == '__main__':
     root = 'D://DeepLearningData/VOC2012'
 
     transform_og = transforms.Compose([transforms.Resize((416, 416)),
-                                              transforms.ToTensor(),
-                                              transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+                                       transforms.ToTensor()])
+    transform_norm = transforms.Compose([transforms.Resize((416, 416)),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_noise = transforms.Compose([transforms.Resize((416, 416)),
+                                          transforms.ToTensor(),
+                                          GaussianNoise(mean=0, std=.2)])
+    transform_norm_noise = transforms.Compose([transforms.Resize((416, 416)),
+                                               transforms.ToTensor(),
+                                               transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+                                               GaussianNoise(mean=0, std=.2)])
     transform_rotate = transforms.Compose([transforms.Resize((416, 416)),
                                             transforms.RandomRotation((-60, 60)),
                                             transforms.ToTensor(),
@@ -73,9 +83,12 @@ if __name__ == '__main__':
                                                      transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
 
     dset_og = VOCDataset(root, img_size=(416, 416), transforms=transform_og, is_categorical=True)
-    dset_rotate = VOCDataset(root, img_size=(416, 416), transforms=transform_rotate, is_categorical=True)
-    dset_vflip = VOCDataset(root, img_size=(416, 416), transforms=transform_vflip, is_categorical=True)
-    dset_hflip = VOCDataset(root, img_size=(416, 416), transforms=transform_hflip, is_categorical=True)
+    dset_norm = VOCDataset(root, img_size=(416, 416), transforms=transform_norm, is_categorical=True)
+    dset_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_noise, is_categorical=True)
+    dset_norm_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_norm_noise, is_categorical=True)
+    # dset_rotate = VOCDataset(root, img_size=(416, 416), transforms=transform_rotate, is_categorical=True)
+    # dset_vflip = VOCDataset(root, img_size=(416, 416), transforms=transform_vflip, is_categorical=True)
+    # dset_hflip = VOCDataset(root, img_size=(416, 416), transforms=transform_hflip, is_categorical=True)
 
     num_classes = dset_og.num_classes
 
@@ -86,11 +99,14 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
     train_dset_og = Subset(dset_og, indices=train_idx)
-    train_dset_rotate = Subset(dset_rotate, indices=train_idx)
-    train_dset_vflip = Subset(dset_vflip, indices=train_idx)
-    train_dset_hflip = Subset(dset_hflip, indices=train_idx)
+    train_dset_norm = Subset(dset_norm, indices=train_idx)
+    train_dset_noise = Subset(dset_noise, indices=train_idx)
+    train_dset_norm_noise = Subset(dset_norm_noise, indices=train_idx)
+    # train_dset_rotate = Subset(dset_rotate, indices=train_idx)
+    # train_dset_vflip = Subset(dset_vflip, indices=train_idx)
+    # train_dset_hflip = Subset(dset_hflip, indices=train_idx)
 
-    train_dset = ConcatDataset([dset_og, dset_rotate, dset_vflip, dset_hflip])
+    train_dset = ConcatDataset([dset_og, dset_norm, dset_noise, dset_norm_noise])
     val_dset = Subset(dset_og, indices=val_idx)
 
     # Generate data loaders
