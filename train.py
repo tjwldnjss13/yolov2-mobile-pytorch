@@ -26,9 +26,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.0005)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.001)
-    parser.add_argument('--momentum', type=float, required=False, default=.7)
+    parser.add_argument('--lr', type=float, required=False, default=.000001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.00005)
+    parser.add_argument('--momentum', type=float, required=False, default=.9)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     # Generate VOC dataset
     dset_name = 'voc2012'
-    root = 'D://DeepLearningData/VOC2012'
+    root = 'C://DeepLearningData/VOC2012'
 
     transform_og = transforms.Compose([transforms.Resize((416, 416)),
                                        transforms.ToTensor()])
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                                        [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
-    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_17epoch_0.0005lr_10.29700loss_7.95632losscoord_0.00003lossconf_2.34065losscls.pth'
+    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_4epoch_1e-06lr_7.70601loss_5.43700losscoord_0.00003lossconf_2.26899losscls.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
 
