@@ -26,9 +26,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.0005)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.001)
-    parser.add_argument('--momentum', type=float, required=False, default=.7)
+    parser.add_argument('--lr', type=float, required=False, default=.0001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.00005)
+    parser.add_argument('--momentum', type=float, required=False, default=.9)
     parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                                        [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
-    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_17epoch_0.0005lr_10.29700loss_7.95632losscoord_0.00003lossconf_2.34065losscls.pth'
+    # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_23epoch_1e-06lr_7.51775loss_5.25989losscoord_0.00000lossconf_2.25786losscls.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
 
@@ -203,12 +203,13 @@ if __name__ == '__main__':
             y = make_batch(y_list).to(device)
             predict = make_batch(predict_list).to(device)
 
-            # for idx1 in range(13):
-            #     for idx2 in range(13):
-            #         for idx3 in range(5):
-            #             if y[0, idx1, idx2, 25 * idx3] != 0:
-            #                 print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
-            #                 print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            for idx1 in range(13):
+                for idx2 in range(13):
+                    for idx3 in range(5):
+                        if y[0, idx1, idx2, 25 * idx3 + 4] != 0:
+                            print('\nPredict_temp: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict_temp[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+                            print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+                            print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
 
             del predict_temp, predict_list, y_list, y_temp
 
@@ -226,10 +227,10 @@ if __name__ == '__main__':
 
             H, M, S = time_calculator(t_batch_end - t_start)
 
-            print('<loss> {: <10.5f}  <loss_coord> {: <10.5f}  <loss_confidence> {: <10.5f}  <loss_class> {: <10.5f}  '.format(
+            print('<loss> {: <10.5f}  <loss_coord> {: <10.5f}  <loss_confidence> {: <10.10f}  <loss_class> {: <10.5f}  '.format(
                 loss.detach().cpu().item(), loss_coord.detach().cpu().item(),
                 loss_confidence.detach().cpu().item(), loss_class.detach().cpu().item()), end='')
-            print('<loss_avg> {: <10.5f}  <loss_coord_avg> {: <10.5f}  <loss_confidence_avg> {: <10.5f}  <loss_class_avg> {: <10.5f}  '.format(
+            print('<loss_avg> {: <10.5f}  <loss_coord_avg> {: <10.5f}  <loss_confidence_avg> {: <10.10f}  <loss_class_avg> {: <10.5f}  '.format(
                 train_loss / num_batches, train_loss_coord / num_batches, train_loss_confidence / num_batches,
                 train_loss_class / num_batches
             ), end='')
@@ -250,7 +251,7 @@ if __name__ == '__main__':
         t_train_end = time.time()
         H, M, S = time_calculator(t_train_end - t_train_start)
 
-        print('        <train_loss> {: <10.5f}  <train_loss_coord> {: <10.5f}  <train_loss_confidence> {: <10.5f}  <train_loss_class> {: <10.5f}  '.format(
+        print('        <train_loss> {: <10.5f}  <train_loss_coord> {: <10.5f}  <train_loss_confidence> {: <10.10f}  <train_loss_class> {: <10.5f}  '.format(
             train_loss_list[-1], train_loss_coord_list[-1], train_loss_confidence_list[-1], train_loss_class_list[-1]), end='')
         print('<time> {:02d}:{:02d}:{:02d} '.format(int(H), int(M), int(S)))
 
@@ -319,11 +320,11 @@ if __name__ == '__main__':
             val_loss_confidence_list.append(val_loss_confidence)
             val_loss_class_list.append(val_loss_class)
 
-            print('        <val_loss> {: <10.5f}  <val_loss_coord> {: <10.5f}  <val_loss_confidence> {: <10.5f}  <val_loss_class> {: <10.5f}'.format(
+            print('        <val_loss> {: <10.5f}  <val_loss_coord> {: <10.5f}  <val_loss_confidence> {: <10.10f}  <val_loss_class> {: <10.5f}'.format(
                 val_loss_list[-1], val_loss_coord_list[-1], val_loss_confidence_list[-1], val_loss_class_list[-1]))
 
             if (e + 1) % model_save_term == 0:
-                save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss_{:.5f}losscoord_{:.5f}lossconf_{:.5f}losscls.pth'.format(
+                save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss_{:.5f}losscoord_{:.10f}lossconf_{:.5f}losscls.pth'.format(
                     model_name, dset_name, e + 1, learning_rate, val_loss_list[-1], val_loss_coord_list[-1],
                     val_loss_confidence_list[-1], val_loss_class_list[-1])
                 torch.save(model.state_dict(), save_pth)

@@ -1,7 +1,7 @@
 import torch
 
 from utils.pytorch_util import calculate_iou
-from utils.anchor_box_util import convert_box_from_hw_to_yx
+from utils.pytorch_util import convert_box_from_hw_to_yx
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
@@ -28,8 +28,8 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     """
     NUM_BATCH, H, W = predict.shape[:3]
 
-    pred = predict.reshape(NUM_BATCH, -1, 5 + num_classes)
-    tar = target.reshape(NUM_BATCH, -1, 5 + num_classes)
+    pred = predict.reshape(NUM_BATCH, -1, 5 + num_classes)  # [num batch, h * w * 5(num predict bbox), 5(num coords) + num classes)]
+    tar = target.reshape(NUM_BATCH, -1, 5 + num_classes)  # [num batch, h * w * 5(num predict bbox), 5(num coords) + num classes)]
     anc = anchor_boxes.reshape(-1, 4)
 
     # obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
@@ -67,13 +67,22 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
 
     tar_bboxes = torch.cat([tar_y1.unsqueeze(2), tar_x1.unsqueeze(2), tar_y2.unsqueeze(2), tar_x2.unsqueeze(2)], dim=2)
 
-    indices_valid = torch.where(tar_probs == 1)
+    ########## Original (start) ########## - 2021.03.02
+    # indices_valid = torch.where(tar_probs == 1)
+    ########## Original (end) ########## - 2021.03.02
+    ########## Changed (start) ########## - 2021.03.02
+    indices_valid = torch.where(tar_probs > 0)
+    ########## Changed (end) ########## - 2021.03.02
     # pred_bboxes_valid = pred_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
     # tar_bboxes_valid = tar_bboxes[indices_valid].reshape(NUM_BATCH, -1, 4)
     pred_bboxes_valid = pred_bboxes[indices_valid].reshape(-1, 4)
     tar_bboxes_valid = tar_bboxes[indices_valid].reshape(-1, 4)
 
     ious_valid = calculate_iou(pred_bboxes_valid, tar_bboxes_valid, dim=1).reshape(-1)
+
+    # for b in range(len(pred_bboxes_valid)):
+    #     if ious_valid[b].detach().cpu().numpy() > 1:
+    #         print(pred_bboxes_valid[b].detach().cpu().numpy(), tar_bboxes_valid[b].detach().cpu().numpy(), ious_valid[b].detach().cpu().numpy())
 
     ious = torch.zeros(NUM_BATCH, H * W * 5).to(device)  # [num batch, h * w * 5(num predict bbox)]
     ious[indices_valid] = ious_valid
@@ -90,17 +99,29 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
 
     idx3 = indices_argmax_ious.reshape(-1).squeeze()
 
-    obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)  # [num batch, h * w, 5(num predict bbox)]
-    # obj_responsible_mask[indices_argmax_ious] = 1
-    obj_responsible_mask[idx1, idx2, idx3] = 1
+    obj_responsible_mask = torch.zeros(NUM_BATCH, H * W * 5).to(device)  # [num batch, h * w, 5(num predict bbox)]
+    # obj_responsible_mask[idx1, idx2, idx3] = 1
+    obj_responsible_mask[indices_valid] = 1
+    obj_responsible_mask = obj_responsible_mask.reshape(NUM_BATCH, -1, 5)
 
-    no_obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
-    no_obj_responsible_mask[indices_argmax_ious[:-1]] = 1
-    no_obj_responsible_mask[indices_argmax_ious] = 0
+    # for i in range(NUM_BATCH):
+    #     for j in range(13 * 13):
+    #         for m in range(5):
+    #             if obj_responsible_mask[i, j, m] == 1:
+    #                 print(i, j, m, obj_responsible_mask[i, j, m])
 
-    responsible_mask = torch.zeros(obj_responsible_mask.shape[:-1]).to(device)
-    for i in range(num_bbox_predict):
-        responsible_mask += obj_responsible_mask[:, :, i]
+    ########## Original (start) ########## - 2021.03.02
+    # no_obj_responsible_mask = torch.zeros(NUM_BATCH, H * W, 5).to(device)
+    # no_obj_responsible_mask[indices_argmax_ious[:-1]] = 1
+    # no_obj_responsible_mask[indices_argmax_ious] = 0
+    ########## Original (end) ########## - 2021.03.02
+    ########## Changed (start) ########## - 2021.03.02
+    no_obj_responsible_mask = 1 - obj_responsible_mask
+    ########## Changed (end) ########## - 2021.03.02
+
+    # responsible_mask = torch.zeros(obj_responsible_mask.shape[:-1]).to(device)
+    # for i in range(num_bbox_predict):
+    #     responsible_mask += obj_responsible_mask[:, :, i]
 
     # Get coordinate loss(1)
     loss_coord = torch.square(pred[:, :, 0] - tar[:, :, 0]) + \
@@ -109,16 +130,34 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
                  torch.square(torch.sqrt(pred[:, :, 3]) - torch.sqrt(tar[:, :, 3]))
     loss_coord *= lambda_coord * obj_responsible_mask.reshape(NUM_BATCH, -1)
 
+    # for i in range(pred.shape[1]):
+    #     if tar[0, i, 4] == 1:
+    #         print(pred[0, i, 4], tar[0, i, 4], ious.reshape(NUM_BATCH, -1)[0, i])
+
     # Get confidence loss(2)
-    loss_confidence = torch.square(pred[:, :, 4] - tar[:, :, 4] * ious.reshape(NUM_BATCH, -1)) + \
+    loss_confidence = obj_responsible_mask.reshape(NUM_BATCH, -1) * torch.square(pred[:, :, 4] - tar[:, :, 4] * ious.reshape(NUM_BATCH, -1)) + \
                       lambda_noobj * no_obj_responsible_mask.reshape(NUM_BATCH, -1) * \
-                      torch.square(pred[:, :, 4] - tar[:, :, 4] * ious.reshape(NUM_BATCH, -1))
+                      torch.square(pred[:, :, 4] - tar[:, :, 4])
+
 
     # Get class loss(3)
     loss_class = torch.square(pred[:, :, 5:] - tar[:, :, 5:])
-    loss_class = loss_class.reshape(NUM_BATCH, H * W, -1)
+    ########## Original (start) ########## - 2021.03.02
+    # loss_class = loss_class.reshape(NUM_BATCH, H * W, -1)
+    ########## Original (end) ########## - 2021.03.02
     loss_class = torch.sum(loss_class, dim=2)
-    loss_class *= responsible_mask.reshape(NUM_BATCH, -1)
+    ########## Original (start) ########## - 2021.03.02
+    # loss_class *= responsible_mask.reshape(NUM_BATCH, -1)
+    ########## Original (end) ########## - 2021.03.02
+    ########## Changed (start) ########## - 2021.03.02
+    loss_class *= obj_responsible_mask.reshape(NUM_BATCH, -1)
+    ########## Changed (end) ########## - 2021.03.02
+
+    # for i in range(NUM_BATCH):
+    #     for j in range(13 * 13):
+    #         for m in range(5):
+    #             if loss_class.reshape(NUM_BATCH, -1, 5)[i, j, m] != 0:
+    #                 print(i, j, m, loss_class.reshape(NUM_BATCH, -1, 5)[i, j, m])
 
     # Sum up all the losses
     loss_coord = loss_coord.sum() / NUM_BATCH

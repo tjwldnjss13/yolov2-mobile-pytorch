@@ -161,19 +161,29 @@ def calculate_iou(box1, box2, dim=0):
     :return:
     """
 
+    # y1_inter = torch.max(box1[..., 0], box2[..., 0], dim=-1)
+    # x1_inter = torch.max(box1[..., 1], box2[..., 1], dim=-1)
+    # y2_inter = torch.min(box1[..., 2], box2[..., 2], dim=-1)
+    # x2_inter = torch.min(box1[..., 3], box2[..., 3], dim=-1)
+    #
+    # area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
+    #
+    # area_box1 = (box1[..., 2] - box1[..., 0]) * (box1[..., 3] - box1[..., 1])
+    # area_box2 = (box2[..., 2] - box2[..., 0]) * (box2[..., 3] - box2[..., 1])
+    # area_union = area_box1 + area_box2 - area_inter
+    #
+    # iou = area_inter / area_union
+
+    # print(box1, box2)
+
     if dim == 0:
         y1_inter = torch.max(box1[0], box2[0])
         x1_inter = torch.max(box1[1], box2[1])
         y2_inter = torch.min(box1[2], box2[2])
         x2_inter = torch.min(box1[3], box2[3])
 
-        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
-
         area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
         area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-        area_union = area_box1 + area_box2 - area_inter
-
-        iou = area_inter / area_union
 
     elif dim == 1:
         y1_inter = torch.max(box1[:, 0], box2[:, 0])
@@ -181,13 +191,8 @@ def calculate_iou(box1, box2, dim=0):
         y2_inter = torch.min(box1[:, 2], box2[:, 2])
         x2_inter = torch.min(box1[:, 3], box2[:, 3])
 
-        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
-
         area_box1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])
         area_box2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
-        area_union = area_box1 + area_box2 - area_inter
-
-        iou = area_inter / area_union
 
     elif dim == 2:
         y1_inter = torch.max(box1[:, :, 0], box2[:, :, 0])
@@ -195,13 +200,13 @@ def calculate_iou(box1, box2, dim=0):
         y2_inter = torch.min(box1[:, :, 2], box2[:, :, 2])
         x2_inter = torch.min(box1[:, :, 3], box2[:, :, 3])
 
-        area_inter = (y2_inter - y1_inter) * (x2_inter - x1_inter)
-
         area_box1 = (box1[:, :, 2] - box1[:, :, 0]) * (box1[:, :, 3] - box1[:, :, 1])
         area_box2 = (box2[:, :, 2] - box2[:, :, 0]) * (box2[:, :, 3] - box2[:, :, 1])
-        area_union = area_box1 + area_box2 - area_inter
 
-        iou = area_inter / area_union
+    area_inter = torch.nn.ReLU()(y2_inter - y1_inter) * torch.nn.ReLU()(x2_inter - x1_inter)
+    area_union = area_box1 + area_box2 - area_inter
+
+    iou = area_inter / area_union
 
     return iou
 
@@ -314,3 +319,74 @@ def mean_iou_seg_argmin_pytorch(a, b):
     iou = torch.true_divide(iou_sum, n_batch)
 
     return iou
+
+
+def convert_box_from_hw_to_yx(bbox):
+    """
+    :param bbox: tensor, [..., (cy, cx, h, w)]
+    :return: tensor, [..., (y1, x1, y2, x2)]
+    """
+
+    cy, cx, h, w = bbox[..., 0], bbox[..., 1], bbox[..., 2], bbox[..., 3]
+    y1, x1, y2, x2 = cy - .5 * h, cx - .5 * w, cy + .5 * h, cx + .5 * w
+    y1, x1, y2, x2 = y1.unsqueeze(-1), x1.unsqueeze(-1), y2.unsqueeze(-1), x2.unsqueeze(-1)
+
+    return torch.cat([y1, x1, y2, x2], dim=-1)
+
+
+def non_maximum_suppression(bounding_boxes, scores, threshold):
+    """
+    :param bounding_boxes: tensor, [-1, 4]
+    :param scores: tensor, [-1]
+    :param threshold: float
+    :return: list, [-1, 4]
+    """
+    bboxes = bounding_boxes
+
+    _, indices = torch.sort(scores, descending=True)
+    bboxes = bboxes[indices]
+    bboxes_result = []
+
+    base = bboxes[0]
+    bboxes_result.append(base)
+    for i in range(1, len(bboxes)):
+        iou = calculate_iou(base, bboxes[i])
+        if iou < threshold:
+            bboxes_result.append(bboxes[i])
+
+    return bboxes_result
+
+
+if __name__ == '__main__':
+    pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

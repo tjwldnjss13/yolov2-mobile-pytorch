@@ -170,17 +170,6 @@ def get_anchor_boxes_voc(voc_dataset, num_anchor_boxes):
     return anchor_boxes
 
 
-def convert_box_from_hw_to_yx(bbox):
-    """
-    :param bbox: tensor, [cy, cx, h, w]
-    :return: tensor, [y1, x1, y2, x2]
-    """
-
-    cy, cx, h, w = bbox
-    y1, x1, y2, x2 = cy - .5 * h, cx - .5 * w, cy + .5 * h, cx + .5 * w
-
-    return torch.Tensor([y1, x1, y2, x2])
-
 
 # root = 'C://DeepLearningData/VOC2012/'
 # dset = VOCDataset(root, (1, 1))

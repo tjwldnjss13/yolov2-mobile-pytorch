@@ -17,8 +17,8 @@ def get_output_anchor_box_tensor(anchor_box_sizes, out_size):
     out = torch.zeros(out_size[0], out_size[1], 4 * len(anchor_box_sizes)).to(device)
     cy_ones = torch.ones(1, out_size[1])
     cx_ones = torch.ones(out_size[0], 1)
-    cy_tensor = torch.zeros(1, out_size[1]) + .5
-    cx_tensor = torch.zeros(out_size[0], 1) + .5
+    cy_tensor = torch.zeros(1, out_size[1])
+    cx_tensor = torch.zeros(out_size[0], 1)
     for i in range(1, out_size[0]):
         cy_tensor = torch.cat([cy_tensor, cy_ones * i], dim=0)
         cx_tensor = torch.cat([cx_tensor, cx_ones * i], dim=1)
@@ -50,8 +50,9 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
     sigmoid = torch.nn.Sigmoid()
     softmax = torch.nn.Softmax(dim=2)
     tanh = torch.nn.Tanh()
+    relu = torch.nn.ReLU()
 
-    num_anchor_boxes = int(anchor_boxes.shape[2] / 5)
+    num_anchor_boxes = int(anchor_boxes.shape[2] / 4)
     num_data_per_box = int(deltas.shape[2] / num_anchor_boxes)
 
     for i in range(num_anchor_boxes):
@@ -63,10 +64,23 @@ def get_yolo_v2_output_tensor(deltas, anchor_boxes):
         # out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         # out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
         #     softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
+        
+        ########## Original (start) ########## - 2021.03.02
         out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
             sigmoid(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2])
-        out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = torch.exp(
-            (deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]))
+        ########## Original (end) ########## - 2021.03.02
+        ########## Changed (start) ########## - 2021.03.02
+        # out[:, :, num_data_per_box * i: num_data_per_box * i + 2] = \
+        #     relu(deltas[:, :, num_data_per_box * i:num_data_per_box * i + 2])
+        ########## Changed (end) ########## - 2021.03.02
+        ########## Original (start) ########## - 2021.03.02
+        out[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4] = \
+            torch.exp(deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4])
+        ########## Original (end) ########## - 2021.03.02
+        ########## Changed (start) ########## - 2021.03.02
+        # out[:, :, num_data_per_box * i:num_data_per_box * i + 2] = \
+        #     deltas[:, :, num_data_per_box * i + 2:num_data_per_box * i + 4]
+        ########## Changed (end) ########## - 2021.03.02
         out[:, :, num_data_per_box * i + 4] = sigmoid(deltas[:, :, num_data_per_box * i + 4])
         out[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)] = \
             softmax(deltas[:, :, num_data_per_box * i + 5:num_data_per_box * (i + 1)])
@@ -143,6 +157,9 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
     ratio_x = out_w / in_w
 
     target = torch.zeros((out_h, out_w, (5 + n_class) * n_bbox_predict))
+    for b in range(n_bbox_predict):
+        target[:, :, (5 + n_class) * b:(5 + n_class) * b + 2] = .5
+        target[:, :, (5 + n_class) * b + 2:(5 + n_class) * b + 4] = 1
 
     for i in range(n_gt):
         gt = gt_bboxes[i]
@@ -154,9 +171,6 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
         y_idx, x_idx = int(y_gt), int(x_gt)
         y, x = y_gt - int(y_gt), x_gt - int(x_gt)
         label = labels[i]
-
-        # h_anc, w_anc = anchor_boxes[y_idx, x_idx, 2:4]
-        # h, w = h_gt / h_anc, w_gt / w_anc
 
         iou_gt_anchor_list = []
         for j in range(n_bbox_predict):
@@ -183,12 +197,15 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
 
         h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * anc_idx + 2:4 * (anc_idx + 1)]
         h, w = h_gt / h_anc, w_gt / w_anc
+        # ########## Added ########## - 2021.03.02
+        # h, w = torch.log(h + 1e-20), torch.log(w + 1e-20)
 
         target[y_idx, x_idx, (5 + n_class) * anc_idx] = y
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
+        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
         target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
 
         # print(iou_gt_anchor_list[anc_idx])

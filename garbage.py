@@ -51,32 +51,8 @@ class SimpleModel(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    import torchvision.transforms as transforms
-    import torchvision.transforms.functional as TF
-    from PIL import Image
-    from dataset.augment import GaussianNoise
-
-    img = Image.open('sample/boat.jpg')
-    img = transforms.ToTensor()(img)
-    plt.figure(0)
-    plt.imshow(img.permute(1, 2, 0))
-
-    def normalize(tensor):
-        return TF.normalize(tensor, mean=[.485, .456, .406], std=[.229, .224, .225])
-
-    img_norm = normalize(img)
-    plt.figure(1)
-    plt.imshow(img_norm.permute(1, 2, 0))
-
-    img_noise = GaussianNoise(mean=0, std=.2)(img)
-    plt.figure(2)
-    plt.imshow(img_noise.permute(1, 2, 0))
-
-    img_norm_noise = GaussianNoise(mean=0, std=.2)(img_norm)
-    plt.figure(3)
-    plt.imshow(img_norm_noise.permute(1, 2, 0))
-
-    plt.show()
+    a = torch.Tensor([.9])
+    print(torch.exp(a))
 
 
 
