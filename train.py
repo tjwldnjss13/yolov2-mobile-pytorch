@@ -1,4 +1,6 @@
 import os
+import copy
+import cv2 as cv
 import numpy as np
 import time
 import argparse
@@ -8,15 +10,17 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
 from torch.utils.data import DataLoader, ConcatDataset, Subset
+from PIL import Image
 
 from utils.util import time_calculator
 from utils.pytorch_util import make_batch
 from utils.yolov2_tensor_generator import get_output_anchor_box_tensor, get_yolo_v2_output_tensor, get_yolo_v2_target_tensor
-# from dataset.coco_dataset import COCODataset, custom_collate_fn
-from dataset.voc_dataset import VOCDataset, custom_collate_fn
+from dataset.coco_dataset import COCODataset, custom_collate_fn
+# from dataset.voc_dataset import VOCDataset, custom_collate_fn
 from dataset.augment import GaussianNoise
 from models.yolov2_model import YOLOV2Mobile
-from loss import yolov2_custom_loss_1 as yolo_custom_loss
+from loss import yolov2_custom_loss_1 as loss_func
+from early_stopping import EarlyStopping
 
 
 if __name__ == '__main__':
@@ -25,11 +29,11 @@ if __name__ == '__main__':
     # Define hyper parameters, parsers
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--batch_size', type=int, required=False, default=32)
-    parser.add_argument('--lr', type=float, required=False, default=.0001)
-    parser.add_argument('--weight_decay', type=float, required=False, default=.00005)
+    parser.add_argument('--batch_size', type=int, required=False, default=16)
+    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--weight_decay', type=float, required=False, default=.0005)
     parser.add_argument('--momentum', type=float, required=False, default=.9)
-    parser.add_argument('--num_epochs', type=int, required=False, default=50)
+    parser.add_argument('--num_epochs', type=int, required=False, default=100)
 
     args = parser.parse_args()
 
@@ -42,72 +46,75 @@ if __name__ == '__main__':
     model_save_term = 1
 
     # Generate COCO dataset
-    # dset_name = 'coco2017'
-    # root = 'C://DeepLearningData/COCOdataset2017/'
-    # train_img_dir = os.path.join(root, 'images', 'train')
-    # val_img_dir = os.path.join(root, 'images', 'val')
-    # train_ann_pth = os.path.join(root, 'annotations', 'instances_train2017.json')
-    # val_ann_pth = os.path.join(root, 'annotations', 'instances_val2017.json')
-    # transform = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])
-    #
-    # train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, is_categorical=True, transforms=transform)
-    # val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, is_categorical=True, transforms=transform)
+    dset_name = 'coco2017'
+    root = 'D://DeepLearningData/COCOdataset2017/'
+    train_img_dir = os.path.join(root, 'images', 'train')
+    val_img_dir = os.path.join(root, 'images', 'val')
+    train_ann_pth = os.path.join(root, 'annotations', 'instances_train2017.json')
+    val_ann_pth = os.path.join(root, 'annotations', 'instances_val2017.json')
+    transform = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])
+
+    train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform)
+    val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform)
+
+    num_classes = train_dset.num_classes
 
     # Generate VOC dataset
-    dset_name = 'voc2012'
-    root = 'D://DeepLearningData/VOC2012'
-
-    transform_og = transforms.Compose([transforms.Resize((416, 416)),
-                                       transforms.ToTensor()])
-    transform_norm = transforms.Compose([transforms.Resize((416, 416)),
-                                         transforms.ToTensor(),
-                                         transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_noise = transforms.Compose([transforms.Resize((416, 416)),
-                                          transforms.ToTensor(),
-                                          GaussianNoise(mean=0, std=.2)])
-    transform_norm_noise = transforms.Compose([transforms.Resize((416, 416)),
-                                               transforms.ToTensor(),
-                                               transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
-                                               GaussianNoise(mean=0, std=.2)])
-    transform_rotate = transforms.Compose([transforms.Resize((416, 416)),
-                                            transforms.RandomRotation((-60, 60)),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_vflip = transforms.Compose([transforms.Resize((416, 416)),
-                                                   transforms.RandomVerticalFlip(1),
-                                                   transforms.ToTensor(),
-                                                   transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_hflip = transforms.Compose([transforms.Resize((416, 416)),
-                                                     transforms.RandomHorizontalFlip(1),
-                                                     transforms.ToTensor(),
-                                                     transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-
-    dset_og = VOCDataset(root, img_size=(416, 416), transforms=transform_og, is_categorical=True)
-    dset_norm = VOCDataset(root, img_size=(416, 416), transforms=transform_norm, is_categorical=True)
-    dset_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_noise, is_categorical=True)
-    dset_norm_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_norm_noise, is_categorical=True)
-    # dset_rotate = VOCDataset(root, img_size=(416, 416), transforms=transform_rotate, is_categorical=True)
-    # dset_vflip = VOCDataset(root, img_size=(416, 416), transforms=transform_vflip, is_categorical=True)
-    # dset_hflip = VOCDataset(root, img_size=(416, 416), transforms=transform_hflip, is_categorical=True)
-
-    num_classes = dset_og.num_classes
-
-    n_data = len(dset_og)
-    n_train_data = int(n_data * .7)
-    indices = list(range(n_data))
-
-    np.random.shuffle(indices)
-    train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
-    train_dset_og = Subset(dset_og, indices=train_idx)
-    train_dset_norm = Subset(dset_norm, indices=train_idx)
-    train_dset_noise = Subset(dset_noise, indices=train_idx)
-    train_dset_norm_noise = Subset(dset_norm_noise, indices=train_idx)
-    # train_dset_rotate = Subset(dset_rotate, indices=train_idx)
-    # train_dset_vflip = Subset(dset_vflip, indices=train_idx)
-    # train_dset_hflip = Subset(dset_hflip, indices=train_idx)
-
-    train_dset = ConcatDataset([dset_og, dset_norm, dset_noise, dset_norm_noise])
-    val_dset = Subset(dset_og, indices=val_idx)
+    # dset_name = 'voc2012'
+    # root = 'D://DeepLearningData/VOC2012'
+    #
+    # transform_og = transforms.Compose([transforms.Resize((416, 416)),
+    #                                    transforms.ToTensor()])
+    # transform_norm = transforms.Compose([transforms.Resize((416, 416)),
+    #                                      transforms.ToTensor(),
+    #                                      transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    # transform_noise = transforms.Compose([transforms.Resize((416, 416)),
+    #                                       transforms.ToTensor(),
+    #                                       GaussianNoise(mean=0, std=.2)])
+    # transform_norm_noise = transforms.Compose([transforms.Resize((416, 416)),
+    #                                            transforms.ToTensor(),
+    #                                            transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+    #                                            GaussianNoise(mean=0, std=.2)])
+    # transform_rotate = transforms.Compose([transforms.Resize((416, 416)),
+    #                                         transforms.RandomRotation((-60, 60)),
+    #                                         transforms.ToTensor(),
+    #                                         transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    # transform_vflip = transforms.Compose([transforms.Resize((416, 416)),
+    #                                                transforms.RandomVerticalFlip(1),
+    #                                                transforms.ToTensor(),
+    #                                                transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    # transform_hflip = transforms.Compose([transforms.Resize((416, 416)),
+    #                                                  transforms.RandomHorizontalFlip(1),
+    #                                                  transforms.ToTensor(),
+    #                                                  transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    #
+    # dset_og = VOCDataset(root, img_size=(416, 416), transforms=transform_og, is_categorical=True)
+    # dset_norm = VOCDataset(root, img_size=(416, 416), transforms=transform_norm, is_categorical=True)
+    # dset_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_noise, is_categorical=True)
+    # dset_norm_noise = VOCDataset(root, img_size=(416, 416), transforms=transform_norm_noise, is_categorical=True)
+    # # dset_rotate = VOCDataset(root, img_size=(416, 416), transforms=transform_rotate, is_categorical=True)
+    # # dset_vflip = VOCDataset(root, img_size=(416, 416), transforms=transform_vflip, is_categorical=True)
+    # # dset_hflip = VOCDataset(root, img_size=(416, 416), transforms=transform_hflip, is_categorical=True)
+    #
+    # num_classes = dset_og.num_classes
+    #
+    # n_data = len(dset_og)
+    # n_train_data = int(n_data * .7)
+    # indices = list(range(n_data))
+    #
+    # np.random.shuffle(indices)
+    # train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
+    # train_dset_og = Subset(dset_og, indices=train_idx)
+    # train_dset_norm = Subset(dset_norm, indices=train_idx)
+    # train_dset_noise = Subset(dset_noise, indices=train_idx)
+    # train_dset_norm_noise = Subset(dset_norm_noise, indices=train_idx)
+    # # train_dset_rotate = Subset(dset_rotate, indices=train_idx)
+    # # train_dset_vflip = Subset(dset_vflip, indices=train_idx)
+    # # train_dset_hflip = Subset(dset_hflip, indices=train_idx)
+    #
+    # train_dset = ConcatDataset([dset_og, dset_norm, dset_noise, dset_norm_noise])
+    # # train_dset = train_dset_og
+    # val_dset = Subset(dset_og, indices=val_idx)
 
     # Generate data loaders
     train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
@@ -122,15 +129,14 @@ if __name__ == '__main__':
                                        [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
-    # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_23epoch_1e-06lr_7.51775loss_5.25989losscoord_0.00000lossconf_2.25786losscls.pth'
+    # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_132+83epoch_5e-06lr_1.62645loss_0.11102losscoord_1.4945946443lossconf_0.02084losscls.pth'
     if state_dict_pth is not None:
-        model.load_state_dict(torch.load(state_dict_pth))
+        model.load_state_dict(torch.load(state_dict_pth), strict=False)
 
     # Define optimizer, loss function
-    optimizer = optim.Adam(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    optimizer = optim.Adam(params=model.parameters(), lr=learning_rate)
     # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=.9)
-    loss_func = yolo_custom_loss
 
     # Define anchor box configuration
     dummy = torch.zeros(1, 3, 416, 416).to(device)
@@ -178,9 +184,6 @@ if __name__ == '__main__':
             for b in range(len(anns)):
                 ground_truth_box = anns[b]['bbox']
                 label_categorical = anns[b]['label_categorical']
-                fn = anns[b]['filename']
-                name = anns[b]['name']
-                label_int = anns[b]['label']
 
                 # print(f'{label_int} {label_categorical} {name} {fn} {ground_truth_box / 32}')
 
@@ -200,18 +203,61 @@ if __name__ == '__main__':
                                                     out_size=(13, 13))
                 y_list.append(y_temp)
 
+                # print(f'[{b + 1}] {fn}')
+                ########## Target generate test (start) ##########
+                # img_temp = imgs[b].permute(1, 2, 0).numpy().copy()
+                # y_temp = y_temp.reshape(13, 13, 5, -1).to(device)
+                # y_coords_temp = y_temp[:, :, :, :4]
+                # y_probs_temp = y_temp[:, :, :, 4].reshape(-1)
+                # anc_box_temp = anchor_box_base.reshape(13, 13, 5, 4)
+                #
+                # y_coords_temp[..., :2] += anc_box_temp[..., :2]
+                # y_coords_temp[..., 2:4] *= anc_box_temp[..., 2:4]
+                #
+                # y_coords_temp *= 416 / 13
+                #
+                # y_coords_temp = y_coords_temp.reshape(-1, 4)
+                # y1_temp = y_coords_temp[..., 0] - .5 * y_coords_temp[..., 2]
+                # x1_temp = y_coords_temp[..., 1] - .5 * y_coords_temp[..., 3]
+                # y2_temp = y1_temp + y_coords_temp[..., 2]
+                # x2_temp = x1_temp + y_coords_temp[..., 3]
+                #
+                # y1_temp = y1_temp.int()
+                # x1_temp = x1_temp.int()
+                # y2_temp = y2_temp.int()
+                # x2_temp = x2_temp.int()
+                #
+                # cnt = 0
+                # for idx1 in range(y_coords_temp.shape[0]):
+                #     if y_probs_temp[idx1] != 0:
+                #         cv.rectangle(img_temp, (x1_temp[idx1], y1_temp[idx1]), (x2_temp[idx1], y2_temp[idx1]), (0, 255, 0), thickness=3)
+                #         cnt += 1
+                #     #     print(f'[{b + 1}] {fn} {y_coords_temp[idx1]}')
+                # print(cnt)
+                #
+                # cv.imshow('image', img_temp)
+                # if cv.waitKey(0) == ord('q'):
+                #     cv.destroyAllWindows()
+                #
+                # # for idx1 in range(13):
+                # #     for idx2 in range(13):
+                # #         for idx3 in range(5):
+                # #             if y_probs_temp[idx1, idx2, idx3] == 1:
+                # #                 print(f'[{b + 1}] ({idx1}, {idx2}, {idx3}) {y_coords_temp[idx1, idx2, idx3]}')
+                ########## Target generate test (end) ##########
+
             y = make_batch(y_list).to(device)
             predict = make_batch(predict_list).to(device)
 
-            for idx1 in range(13):
-                for idx2 in range(13):
-                    for idx3 in range(5):
-                        if y[0, idx1, idx2, 25 * idx3 + 4] != 0:
-                            print('\nPredict_temp: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict_temp[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
-                            print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
-                            print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            # for idx1 in range(13):
+            #     for idx2 in range(13):
+            #         for idx3 in range(5):
+            #             if y[0, idx1, idx2, 25 * idx3 + 4] != 0:
+            #                 print('\nPredict_temp: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict_temp[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #                 print('\nPredict: ({}, {}, {}) {}'.format(idx1, idx2, idx3, predict[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
+            #                 print('y: ({}, {}, {}) {}'.format(idx1, idx2, idx3, y[0, idx1, idx2, 25 * idx3:25 * (idx3 + 1)]))
 
-            del predict_temp, predict_list, y_list, y_temp
+            del x, predict_temp, predict_list, y_list, y_temp
 
             optimizer.zero_grad()
             loss, loss_coord, loss_confidence, loss_class = loss_func(predict=predict, target=y, anchor_boxes=anchor_box_base, num_bbox_predict=5, num_classes=num_classes)
@@ -227,16 +273,16 @@ if __name__ == '__main__':
 
             H, M, S = time_calculator(t_batch_end - t_start)
 
-            print('<loss> {: <10.5f}  <loss_coord> {: <10.5f}  <loss_confidence> {: <10.10f}  <loss_class> {: <10.5f}  '.format(
+            print('<loss> {: <10.5f}  <loss_coord> {: <10.5f}  <loss_confidence> {: <10.5f}  <loss_class> {: <10.5f}  '.format(
                 loss.detach().cpu().item(), loss_coord.detach().cpu().item(),
                 loss_confidence.detach().cpu().item(), loss_class.detach().cpu().item()), end='')
-            print('<loss_avg> {: <10.5f}  <loss_coord_avg> {: <10.5f}  <loss_confidence_avg> {: <10.10f}  <loss_class_avg> {: <10.5f}  '.format(
+            print('<loss_avg> {: <10.5f}  <loss_coord_avg> {: <10.5f}  <loss_confidence_avg> {: <10.5f}  <loss_class_avg> {: <10.5f}  '.format(
                 train_loss / num_batches, train_loss_coord / num_batches, train_loss_confidence / num_batches,
                 train_loss_class / num_batches
             ), end='')
             print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
 
-            del x, y, predict, loss
+            del y, predict, loss
 
         train_loss /= num_batches
         train_loss_coord /= num_batches
@@ -329,7 +375,7 @@ if __name__ == '__main__':
                     val_loss_confidence_list[-1], val_loss_class_list[-1])
                 torch.save(model.state_dict(), save_pth)
 
-    x_axis = [i for i in range(num_epochs)]
+    x_axis = [i for i in range(len(train_loss_list))]
 
     plt.figure(0)
     plt.plot(x_axis, train_loss_list, 'r-', label='Train')

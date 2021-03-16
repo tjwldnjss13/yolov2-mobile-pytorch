@@ -25,6 +25,8 @@ class YOLOV2Mobile(nn.Module):
 
         # self.anchor_boxes = self._get_valid_anchor_boxes()
 
+        self._initialize_weights()
+
     def _get_valid_anchor_boxes(self):
         dummy = torch.zeros(1, 3, 416, 416)
         out_dummy = self.feature_model(dummy)
@@ -33,6 +35,16 @@ class YOLOV2Mobile(nn.Module):
         anchor_boxes, valid_mask = generate_anchor_box(self.anchor_box_samples, self.in_size, anchor_stride)
 
         return anchor_boxes[torch.nonzero(valid_mask, as_tuple=False)].squeeze(1)
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
 
     def forward(self, x):
         x = self.feature_model(x)

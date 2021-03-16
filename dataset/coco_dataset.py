@@ -8,7 +8,7 @@ from pycocotools.coco import COCO
 
 
 class COCODataset(data.Dataset):
-    def __init__(self, root, images_dir, annotation_path, is_categorical=False, transforms=None, instance_seg=False):
+    def __init__(self, root, images_dir, annotation_path, image_size, is_categorical=False, transforms=None, instance_seg=False):
         self.root = root
         self.images_dir = images_dir
         self.coco = COCO(annotation_path)
@@ -17,6 +17,7 @@ class COCODataset(data.Dataset):
         self.transforms = transforms
         self.instance_seg = instance_seg
         self.num_classes = 92  # Background included
+        self.image_size = image_size
 
     def __getitem__(self, index):
         coco = self.coco
@@ -28,6 +29,13 @@ class COCODataset(data.Dataset):
         img = Image.open(os.path.join(self.images_dir, img_fn)).convert('RGB')
         height = int(img_dict['height'])
         width = int(img_dict['width'])
+        ratio_h, ratio_w = self.image_size[0] / height, self.image_size[1] / width
+
+        if self.transforms is not None:
+            img = self.transforms(img)
+        else:
+            transform = transforms.Compose([transforms.ToTensor()])
+            img = transform(img)
 
         num_objs = len(ann)
 
@@ -35,21 +43,20 @@ class COCODataset(data.Dataset):
         boxes = []
         category_names = []
         labels = []
+        labels_categorical = []
 
         for i in range(num_objs):
-            x_min = ann[i]['bbox'][0]
-            y_min = ann[i]['bbox'][1]
-            x_max = x_min + ann[i]['bbox'][2]
-            y_max = y_min + ann[i]['bbox'][3]
+            x_min = ann[i]['bbox'][0] * ratio_w
+            y_min = ann[i]['bbox'][1] * ratio_h
+            x_max = x_min + ann[i]['bbox'][2] * ratio_w
+            y_max = y_min + ann[i]['bbox'][3] * ratio_h
             boxes.append([y_min, x_min, y_max, x_max])
             areas.append(ann[i]['area'])
 
             category_id = ann[i]['category_id']
             labels.append(category_id)
+            labels_categorical.append(self.to_categorical(category_id, self.num_classes))
             category_names.append(coco.loadCats(category_id)[0]['name'])
-
-        if self.is_categorical:
-            labels = self.to_categorical(labels, self.num_classes)
 
         if len(ann) > 0:
             masks = coco.annToMask(ann[0])
@@ -60,6 +67,7 @@ class COCODataset(data.Dataset):
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.as_tensor(labels, dtype=torch.int64)
+        labels_categorical = torch.as_tensor(labels_categorical, dtype=torch.int64)
         img_id = torch.tensor([img_id])
         areas = torch.as_tensor(areas, dtype=torch.float32)
         iscrowd = torch.zeros((num_objs, ), dtype=torch.int64)
@@ -70,17 +78,12 @@ class COCODataset(data.Dataset):
         my_annotation['mask'] = masks
         my_annotation['bbox'] = boxes
         my_annotation['label'] = labels
+        my_annotation['label_categorical'] = labels_categorical
         my_annotation['image_id'] = img_id
         my_annotation['area'] = areas
         my_annotation['iscrowd'] = iscrowd
         my_annotation['category_name'] = category_names
         my_annotation['file_name'] = img_fn
-
-        if self.transforms is not None:
-            img = self.transforms(img)
-        else:
-            transform = transforms.Compose([transforms.ToTensor()])
-            img = transform(img)
 
         return img, my_annotation
 

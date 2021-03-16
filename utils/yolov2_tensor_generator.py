@@ -163,6 +163,8 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
 
     for i in range(n_gt):
         gt = gt_bboxes[i]
+        if len(gt) == 0:
+            continue
         h_gt, w_gt = (gt[2] - gt[0]), (gt[3] - gt[1])  # Height, width is relative to original image
         y_gt, x_gt = (gt[0] + .5 * h_gt) * ratio_y, (gt[1] + .5 * w_gt) * ratio_x
 
@@ -172,41 +174,57 @@ def get_yolo_v2_target_tensor(ground_truth_boxes, anchor_boxes, labels, n_bbox_p
         y, x = y_gt - int(y_gt), x_gt - int(x_gt)
         label = labels[i]
 
-        iou_gt_anchor_list = []
-        for j in range(n_bbox_predict):
-            # target[y_idx, x_idx, (5 + n_class) * j] = x
-            # target[y_idx, x_idx, (5 + n_class) * j + 1] = y
-            # target[y_idx, x_idx, (5 + n_class) * j + 2] = w
-            # target[y_idx, x_idx, (5 + n_class) * j + 3] = h
-            # target[y_idx, x_idx, (5 + n_class) * j + 4] = 1
-            # target[y_idx, x_idx, (5 + n_class) * j + 5:(5 + n_class) * (j + 1)] = label
+        ########## Original (start) ########## - 2021.03.03
+        # iou_gt_anchor_list = []
+        # for j in range(n_bbox_predict):
+        #     # target[y_idx, x_idx, (5 + n_class) * j] = x
+        #     # target[y_idx, x_idx, (5 + n_class) * j + 1] = y
+        #     # target[y_idx, x_idx, (5 + n_class) * j + 2] = w
+        #     # target[y_idx, x_idx, (5 + n_class) * j + 3] = h
+        #     # target[y_idx, x_idx, (5 + n_class) * j + 4] = 1
+        #     # target[y_idx, x_idx, (5 + n_class) * j + 5:(5 + n_class) * (j + 1)] = label
+        #
+        #     cy_anc, cx_anc, h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * j:4 * (j + 1)]
+        #     y1_anc = cy_anc - .5 * h_anc
+        #     x1_anc = cx_anc - .5 * w_anc
+        #     y2_anc = y1_anc + h_anc
+        #     x2_anc = x1_anc + w_anc
+        #     anc = torch.Tensor([y1_anc, x1_anc, y2_anc, x2_anc])
+        #
+        #     # print(f'GT: {gt / 32}, ANC: {anc}')
+        #
+        #     iou = calculate_iou(gt / 32, anc)
+        #     iou_gt_anchor_list.append(iou.item())
+        #
+        # anc_idx = iou_gt_anchor_list.index(max(iou_gt_anchor_list))
+        #
+        # h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * anc_idx + 2:4 * (anc_idx + 1)]
+        # h, w = h_gt / h_anc, w_gt / w_anc
+        # # ########## Added ########## - 2021.03.02
+        # # h, w = torch.log(h + 1e-20), torch.log(w + 1e-20)
+        #
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx] = y
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
+        # # target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
+        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
+        ########## Original (end) ########## - 2021.03.03
 
-            cy_anc, cx_anc, h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * j:4 * (j + 1)]
-            y1_anc = cy_anc - .5 * h_anc
-            x1_anc = cx_anc - .5 * w_anc
-            y2_anc = y1_anc + h_anc
-            x2_anc = x1_anc + w_anc
-            anc = torch.Tensor([y1_anc, x1_anc, y2_anc, x2_anc])
+        ########## Changed (start) ########## - 2021.03.03
+        for anc_idx in range(5):
+            h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * anc_idx + 2:4 * (anc_idx + 1)]
+            h, w = h_gt / h_anc, w_gt / w_anc
 
-            # print(f'GT: {gt / 32}, ANC: {anc}')
-
-            iou = calculate_iou(gt / 32, anc)
-            iou_gt_anchor_list.append(iou.item())
-
-        anc_idx = iou_gt_anchor_list.index(max(iou_gt_anchor_list))
-
-        h_anc, w_anc = anchor_boxes[y_idx, x_idx, 4 * anc_idx + 2:4 * (anc_idx + 1)]
-        h, w = h_gt / h_anc, w_gt / w_anc
-        # ########## Added ########## - 2021.03.02
-        # h, w = torch.log(h + 1e-20), torch.log(w + 1e-20)
-
-        target[y_idx, x_idx, (5 + n_class) * anc_idx] = y
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
-        # target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
-        target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
+            target[y_idx, x_idx, (5 + n_class) * anc_idx] = y
+            target[y_idx, x_idx, (5 + n_class) * anc_idx + 1] = x
+            target[y_idx, x_idx, (5 + n_class) * anc_idx + 2] = h
+            target[y_idx, x_idx, (5 + n_class) * anc_idx + 3] = w
+            # target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = iou_gt_anchor_list[anc_idx]
+            target[y_idx, x_idx, (5 + n_class) * anc_idx + 4] = 1
+            target[y_idx, x_idx, (5 + n_class) * anc_idx + 5:(5 + n_class) * (anc_idx + 1)] = label
+        ########## Changed (end) ########## - 2021.03.03
 
         # print(iou_gt_anchor_list[anc_idx])
 

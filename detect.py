@@ -20,34 +20,36 @@ def detect_objects(image_path, model, anchor_boxes):
     :return:
     """
     img = Image.open(image_path)
-    img = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])(img).unsqueeze(0).to(device)
-    H, W = img.shape[2:]
+    img_tensor = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])(img).unsqueeze(0).to(device)
+    img = np.array(img)
+    H, W = img.shape[:2]
 
-    output = model(img)
-    bboxes, confidences, classes = get_object_informations(output, anchor_boxes, 5, 20)
+    output = model(img_tensor)
+    bboxes, confidences, classes = get_object_informations(output, anchor_boxes, 5, 92)
+    idx_valid = torch.where(confidences > .5)
+    bboxes = bboxes[idx_valid]
+    confidences = confidences[idx_valid]
+    classes = classes[idx_valid]
     bboxes = convert_box_from_hw_to_yx(bboxes)
     bboxes = convert_to_original_size(bboxes, H, W)
 
-    bbox_cat_list, conf_cat_list = categorize_informations(bboxes, confidences, classes, 20)
+    bbox_cat_list, conf_cat_list = categorize_informations(bboxes, confidences, classes, 92)
     bbox_list = []
-
-    # for item in bbox_cat_list:
-    #     print(item)
 
     for i in range(len(bbox_cat_list)):
         if len(bbox_cat_list[i]) == 0:
             continue
-        final_bboxes = non_maximum_suppression(bbox_cat_list[i], conf_cat_list[i], .7)
+        final_bboxes = non_maximum_suppression(bbox_cat_list[i], conf_cat_list[i], .5)
         bbox_list += final_bboxes
 
     # img = img.permute(1, 2, 0)
-    # for bbox in bbox_list:
-    #     y1, x1, y2, x2 = int(bbox[0].item()), int(bbox[1].item()), int(bbox[2].item()), int(bbox[3].item())
-    #     cv.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), thickness=2)
-    #
-    # cv.imshow('detection', img)
-    # if cv.waitKey(0) == ord('q'):
-    #     cv.destroyAllWindows()
+    for i, bbox in enumerate(bbox_list):
+        y1, x1, y2, x2 = int(bbox[0].item()), int(bbox[1].item()), int(bbox[2].item()), int(bbox[3].item())
+        cv.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), thickness=2)
+
+    cv.imshow('detection', img)
+    if cv.waitKey(0) == ord('q'):
+        cv.destroyAllWindows()
 
 
 
@@ -70,8 +72,8 @@ def get_object_informations(tensor, anchor_boxes, num_predict_bounding_boxes, nu
     anchor_boxes = anchor_boxes.reshape(-1, 4)
 
     bboxes[:, :2] = torch.nn.Sigmoid()(bboxes[:, :2]) + anchor_boxes[:, :2]
-    for i in range(bboxes.shape[0]):
-        print(torch.exp(bboxes[i, 2:4]), anchor_boxes[i, 2:4])
+    # for i in range(bboxes.shape[0]):
+    #     print(torch.exp(bboxes[i, 2:4]), anchor_boxes[i, 2:4])
     bboxes[:, 2:4] = torch.exp(bboxes[:, 2:4]) * anchor_boxes[:, 2:4]
 
     return bboxes, confidences, classes
@@ -110,7 +112,7 @@ def categorize_informations(bounding_boxes, confidences, classes, num_classes):
     for i in range(num_classes):
         idx = torch.where(classes == i)[0]
         bbox_category_list[i] = bboxes[idx]
-        confidence_category_list[i] = confidences[i]
+        confidence_category_list[i] = confidences[idx]
 
     return bbox_category_list, confidence_category_list
 
@@ -124,8 +126,8 @@ if __name__ == '__main__':
     anchor_box_base = get_output_anchor_box_tensor(anchor_box_sizes=anchor_box_samples,
                                                    out_size=(13, 13)).to(device)
 
-    state_dict_pth = 'pretrained models/yolov2mobile_voc2012_23epoch_1e-06lr_7.51775loss_5.25989losscoord_0.00000lossconf_2.25786losscls.pth'
-    model = YOLOV2Mobile((416, 416), 20, anchor_box_samples).to(device)
+    state_dict_pth = 'pretrained models/yolov2mobile_coco2017_1epoch_2fold_0.0001lr_12.81251loss_3.76018losscoord_6.30102lossconf_2.75131losscls.pth'
+    model = YOLOV2Mobile((416, 416), 92, anchor_box_samples).to(device)
     model.load_state_dict(torch.load(state_dict_pth))
     model.eval()
 
