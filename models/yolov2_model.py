@@ -17,7 +17,11 @@ class YOLOV2Mobile(nn.Module):
         super(YOLOV2Mobile, self).__init__()
         self.in_size = in_size
         self.num_classes = num_classes
-        self.anchor_box_samples = anchor_box_samples
+        self.anchor_box_samples = torch.Tensor([[1.73145, 1.3221],
+                                       [4.00944, 3.19275],
+                                       [8.09892, 5.05587],
+                                       [4.84053, 9.47112],
+                                       [10.0071, 11.2364]])
 
         self.feature_model = Darknet19DS()
         # self.reg_layer = DSConv(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0, 'relu')

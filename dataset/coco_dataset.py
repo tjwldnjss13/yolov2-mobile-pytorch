@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
@@ -6,9 +7,11 @@ import torchvision.transforms as transforms
 from PIL import Image
 from pycocotools.coco import COCO
 
+from dataset.augment import rotate2d, horizontal_flip
+
 
 class COCODataset(data.Dataset):
-    def __init__(self, root, images_dir, annotation_path, image_size, is_categorical=False, transforms=None, instance_seg=False):
+    def __init__(self, root, images_dir, annotation_path, image_size, is_categorical=False, transforms=None, instance_seg=False, rotate_angle=None, do_horizontal_flip=False):
         self.root = root
         self.images_dir = images_dir
         self.coco = COCO(annotation_path)
@@ -16,6 +19,12 @@ class COCODataset(data.Dataset):
         self.is_categorical = is_categorical
         self.transforms = transforms
         self.instance_seg = instance_seg
+        if isinstance(rotate_angle, int):
+            self.rotate_angle = (-rotate_angle, rotate_angle)
+        else:
+            self.rotate_angle = rotate_angle
+        self.do_horizontal_flip = do_horizontal_flip
+
         self.num_classes = 92  # Background included
         self.image_size = image_size
 
@@ -71,6 +80,12 @@ class COCODataset(data.Dataset):
         img_id = torch.tensor([img_id])
         areas = torch.as_tensor(areas, dtype=torch.float32)
         iscrowd = torch.zeros((num_objs, ), dtype=torch.int64)
+
+        if self.rotate_angle is not None:
+            angle = np.random.randint(self.rotate_angle[0], self.rotate_angle[1])
+            img, boxes = rotate2d(image=img, bounding_box=boxes, angle=angle)
+        if self.do_horizontal_flip:
+            img, boxes = horizontal_flip(image=img, bounding_box=boxes)
 
         my_annotation = {}
         my_annotation['height'] = height

@@ -10,7 +10,8 @@ activation_dict = {'sigmoid': nn.Sigmoid(), 'relu': nn.ReLU(True), 'leaky_relu':
 class Darknet19DS(nn.Module):
     def __init__(self):
         super(Darknet19DS, self).__init__()
-        self.activation_str = 'leaky_relu'
+        self.activation_str = 'relu6'
+        self.activation = activation_dict[self.activation_str]
         self.layer_1 = nn.Sequential(
             nn.Conv2d(3, 32, 3, 1, 1),
             nn.MaxPool2d(2, 2),
@@ -21,25 +22,28 @@ class Darknet19DS(nn.Module):
             DSConv(64, 128, 3, 1, 1, self.activation_str),
             # DSConv(128, 64, 1, 1, 0, self.activation_str),
             nn.Conv2d(128, 64, 1, 1, 0),
-            activation_dict[self.activation_str],
+            nn.BatchNorm2d(64),
+            self.activation,
             DSConv(64, 128, 3, 1, 1, self.activation_str),
             nn.MaxPool2d(2, 2),
 
             DSConv(128, 256, 3, 1, 1, self.activation_str),
             # DSConv(256, 128, 1, 1, 0, self.activation_str),
             nn.Conv2d(256, 128, 1, 1, 0),
-            activation_dict[self.activation_str],
+            nn.BatchNorm2d(128),
+            self.activation,
             DSConv(128, 256, 3, 1, 1, self.activation_str),
             nn.MaxPool2d(2, 2),
 
             DSConv(256, 512, 3, 1, 1, self.activation_str),
             # DSConv(512, 256, 1, 1, 0, self.activation_str),
             nn.Conv2d(512, 256, 1, 1, 0),
-            activation_dict[self.activation_str],
+            nn.BatchNorm2d(256),
+            self.activation,
             DSConv(256, 512, 3, 1, 1, self.activation_str),
             # DSConv(512, 256, 1, 1, 0, self.activation_str),
             nn.Conv2d(512, 256, 1, 1, 0),
-            activation_dict[self.activation_str],
+            self.activation,
             DSConv(256, 512, 3, 1, 1, self.activation_str),
         )
         self.layer_2 = nn.Sequential(
@@ -48,11 +52,12 @@ class Darknet19DS(nn.Module):
             DSConv(512, 1024, 3, 1, 1, self.activation_str),
             # DSConv(1024, 512, 1, 1, 0, self.activation_str),
             nn.Conv2d(1024, 512, 1, 1, 0),
-            activation_dict[self.activation_str],
+            self.activation,
             DSConv(512, 1024, 3, 1, 1, self.activation_str),
             # DSConv(1024, 512, 1, 1, 0, self.activation_str),
             nn.Conv2d(1024, 512, 1, 1, 0),
-            activation_dict[self.activation_str],
+            nn.BatchNorm2d(512),
+            self.activation,
             DSConv(512, 1024, 3, 1, 1, self.activation_str),
             DSConv(1024, 1024, 3, 1, 1, self.activation_str),
             DSConv(1024, 1024, 3, 1, 1, self.activation_str),
@@ -61,7 +66,8 @@ class Darknet19DS(nn.Module):
         # self.layer_3 = DSConv(3072, 1024, 1, 1, 0, self.activation_str)
         self.layer_3 = nn.Sequential(
             nn.Conv2d(3072, 1024, 1, 1, 0),
-            activation_dict[self.activation_str],
+            nn.BatchNorm2d(1024),
+            self.activation
         )
         self.passthrough_layer = DSConv(512, 512, 3, 1, 1, self.activation_str)
 

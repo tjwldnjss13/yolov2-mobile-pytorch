@@ -1,20 +1,15 @@
 import torch.nn as nn
 
+activation_dict = {'sigmoid': nn.Sigmoid(), 'relu': nn.ReLU(True), 'leaky_relu': nn.LeakyReLU(inplace=True), 'relu6': nn.ReLU6(True)}
+
 
 class DSConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, activation='relu', use_batch_norm=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, use_batch_norm=True):
         super(DSConv, self).__init__()
         self.use_batch_norm = use_batch_norm
         self.dconv = DConv(in_channels, kernel_size, stride, padding)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
-        if activation == 'relu':
-            self.activation = nn.ReLU(True)
-        elif activation == 'leaky_relu':
-            self.activation = nn.LeakyReLU(inplace=True)
-        elif activation == 'relu6':
-            self.activation = nn.ReLU6(True)
-        elif activation == 'sigmoid':
-            self.activation = nn.Sigmoid()
+        self.activation = activation_dict['relu6']
         if use_batch_norm:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(out_channels)
@@ -56,3 +51,9 @@ class DConv(nn.Module):
 
     def forward(self, x):
         return self.dconv(x)
+
+
+if __name__ == '__main__':
+    from torchsummary import summary
+    model = DSConv(3, 16, 3, 1, 1).cuda()
+    summary(model, (3, 416, 416))

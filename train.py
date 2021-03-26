@@ -30,10 +30,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, required=False, default=16)
-    parser.add_argument('--lr', type=float, required=False, default=.001)
+    parser.add_argument('--lr', type=float, required=False, default=.001 * (.1 ** 0))
     parser.add_argument('--weight_decay', type=float, required=False, default=.0005)
     parser.add_argument('--momentum', type=float, required=False, default=.9)
-    parser.add_argument('--num_epochs', type=int, required=False, default=100)
+    parser.add_argument('--num_epochs', type=int, required=False, default=50)
 
     args = parser.parse_args()
 
@@ -47,17 +47,26 @@ if __name__ == '__main__':
 
     # Generate COCO dataset
     dset_name = 'coco2017'
-    root = 'D://DeepLearningData/COCOdataset2017/'
+    root = 'C://DeepLearningData/COCOdataset2017/'
     train_img_dir = os.path.join(root, 'images', 'train')
     val_img_dir = os.path.join(root, 'images', 'val')
     train_ann_pth = os.path.join(root, 'annotations', 'instances_train2017.json')
     val_ann_pth = os.path.join(root, 'annotations', 'instances_val2017.json')
-    transform = transforms.Compose([transforms.Resize((416, 416)), transforms.ToTensor()])
+    transform_og = transforms.Compose([transforms.Resize((416, 416)),
+                                       transforms.ToTensor(),
+                                       transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_noise = transforms.Compose([transforms.Resize((416, 416)),
+                                          transforms.ToTensor(),
+                                          GaussianNoise(mean=0, std=.2),
+                                          transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
 
-    train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform)
-    val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform)
+    train_dset = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform_og)
+    train_dset_rotate = COCODataset(root=root, images_dir=train_img_dir, annotation_path=train_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform_og, rotate_angle=(-30, 30))
 
     num_classes = train_dset.num_classes
+
+    train_dset = ConcatDataset([train_dset, train_dset_rotate])
+    val_dset = COCODataset(root=root, images_dir=val_img_dir, annotation_path=val_ann_pth, image_size=(416, 416), is_categorical=True, transforms=transform_og)
 
     # Generate VOC dataset
     # dset_name = 'voc2012'
@@ -117,8 +126,8 @@ if __name__ == '__main__':
     # val_dset = Subset(dset_og, indices=val_idx)
 
     # Generate data loaders
-    train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
-    val_loader = DataLoader(val_dset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
+    train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=custom_collate_fn)
+    val_loader = DataLoader(val_dset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=custom_collate_fn)
 
     # Load model
     model_name = 'yolov2mobile'
@@ -129,13 +138,13 @@ if __name__ == '__main__':
                                        [10.0071, 11.2364]])
     model = YOLOV2Mobile(in_size=(416, 416), num_classes=num_classes, anchor_box_samples=anchor_box_samples).to(device)
     state_dict_pth = None
-    # state_dict_pth = 'pretrained models/yolov2mobile_voc2012_132+83epoch_5e-06lr_1.62645loss_0.11102losscoord_1.4945946443lossconf_0.02084losscls.pth'
+    # state_dict_pth = 'pretrained models/yolov2mobile_coco2017_2+4epoch_0.0001lr_21.07965loss_5.75368losscoord_10.9879736771lossconf_4.33800losscls.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth), strict=False)
 
     # Define optimizer, loss function
     optimizer = optim.Adam(params=model.parameters(), lr=learning_rate)
-    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
+    # optimizer = optim.SGD(params=model.parameters(), lr=learning_rate, momentum=momentum)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=.9)
 
     # Define anchor box configuration
@@ -148,6 +157,7 @@ if __name__ == '__main__':
     #         for idx3 in range(5):
     #             print(f'({idx1}, {idx2}, {idx3}) {anchor_box_base[idx1, idx2, 4 * idx3:4 * (idx3 + 1)]}')
 
+    num_iter = 0
     train_loss_list = []
     train_loss_coord_list = []
     train_loss_confidence_list = []
@@ -172,7 +182,9 @@ if __name__ == '__main__':
             t_batch_start = time.time()
             num_batches += 1
             num_datas += len(imgs)
+            num_iter += 1
             print('[{}/{}] '.format(e + 1, num_epochs), end='')
+            print(f'({num_iter}) ', end='')
             print('{}/{} '.format(num_datas, len(train_dset)), end='')
 
             x = make_batch(imgs).to(device)
