@@ -80,7 +80,7 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     # for idx1 in range(NUM_BATCH):
     #     for idx2 in range(13 * 13 * 5):
     #         if tar[idx1, idx2, 0] != .5:
-    #             print(f'{[idx1 + 1]} {pred[idx1, idx2, :5]}, {tar[idx1, idx2, :5]}')
+    #             print(f'{idx1 + 1} {pred[idx1, idx2, :5].detach().cpu().numpy()}, {tar[idx1, idx2, :5].detach().cpu().numpy()}')
 
     ########## Original (start) ##########
     indices_valid = torch.where(tar_probs > 0)
@@ -196,6 +196,10 @@ def yolov2_custom_loss_1(predict, target, anchor_boxes, num_bbox_predict, num_cl
     loss_confidence = loss_confidence.sum() / NUM_BATCH
     loss_class = loss_class.sum() / NUM_BATCH
     loss = loss_coord + loss_confidence + loss_class
+
+    # if loss.detach().cpu().item() > 1000:
+    #     print('bbox : ', tar_bboxes_valid)
+    #     print('probs : ', tar_probs)
 
     return loss, loss_coord, loss_confidence, loss_class
 

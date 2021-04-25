@@ -4,12 +4,12 @@ activation_dict = {'sigmoid': nn.Sigmoid(), 'relu': nn.ReLU(True), 'leaky_relu':
 
 
 class DSConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, use_batch_norm=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, use_batch_norm=True):
         super(DSConv, self).__init__()
         self.use_batch_norm = use_batch_norm
         self.dconv = DConv(in_channels, kernel_size, stride, padding)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
-        self.activation = activation_dict['relu6']
+        self.activation = activation_dict['leaky_relu']
         if use_batch_norm:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(out_channels)

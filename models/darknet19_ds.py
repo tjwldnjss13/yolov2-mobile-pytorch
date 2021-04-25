@@ -10,7 +10,7 @@ activation_dict = {'sigmoid': nn.Sigmoid(), 'relu': nn.ReLU(True), 'leaky_relu':
 class Darknet19DS(nn.Module):
     def __init__(self):
         super(Darknet19DS, self).__init__()
-        self.activation_str = 'relu6'
+        self.activation_str = 'relu'
         self.activation = activation_dict[self.activation_str]
         self.layer_1 = nn.Sequential(
             nn.Conv2d(3, 32, 3, 1, 1),

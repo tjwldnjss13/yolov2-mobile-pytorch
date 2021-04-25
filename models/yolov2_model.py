@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 
+from models.backbone import YoloBackbone
 from models.darknet19_ds import Darknet19DS
+from models.darknet53_ds import Darknet53DS
 from models.dsconv import DSConv
 from utils.rpn_util import generate_anchor_box
 
@@ -23,9 +25,11 @@ class YOLOV2Mobile(nn.Module):
                                        [4.84053, 9.47112],
                                        [10.0071, 11.2364]])
 
-        self.feature_model = Darknet19DS()
+        self.feature_model = YoloBackbone()
         # self.reg_layer = DSConv(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0, 'relu')
-        self.reg_layer = nn.Conv2d(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1, 0)
+        self.reg_layer = nn.Sequential(
+            nn.Conv2d(1024, len(anchor_box_samples) * (5 + num_classes), 1, 1)
+        )
 
         # self.anchor_boxes = self._get_valid_anchor_boxes()
 
@@ -43,7 +47,7 @@ class YOLOV2Mobile(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                nn.init.kaiming_uniform_(m.weight, mode='fan_out')
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
             elif isinstance(m, nn.BatchNorm2d):
